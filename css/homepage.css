@@ -1,0 +1,27 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 16px;
+    background-color: antiquewhite;
+}
+
+#homepage {
+    display: grid;
+    grid-template-columns: auto;
+    grid-template-rows: auto;
+    width: 80%;
+    padding-left: 10%;
+    padding-right: 10%;
+}
+
+article {
+    max-width: 5rem;
+    max-height: 5rem;
+    background-color: azure;
+    grid-column: span 1;
+    grid-row: span 1;
+}
+
+article img {
+    object-fit: contain;
+    width: auto;
+}
