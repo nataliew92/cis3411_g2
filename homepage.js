@@ -13,7 +13,6 @@ async function fetchData() {
             if (jsonData.records == null) {
                 return [];
             }
-            console.log(jsonData.records);
             allObjects.push(jsonData.records);
             page += 1;
         } catch (error) {
