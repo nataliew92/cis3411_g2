@@ -20,7 +20,7 @@ async function fetchData() {
         }
     }
     const objectList = allObjects.flat();
-    console.log(objectList);
+    console.log('Sample object:', objectList[0]);
     return objectList;
     
 }
