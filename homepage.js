@@ -20,6 +20,7 @@ async function fetchData() {
         }
     }
     const objectList = allObjects.flat();
+    console.log(objectList);
     return objectList;
     
 }
@@ -39,17 +40,22 @@ async function displayObjects() {
             title = 'Untitled';
         }
 
-
         /*image*/
         const imgId = object._primaryImageId;
         const image = imageUrl + "/" + imgId + "/full/!400,400/0/default.jpg";
 
+        /*Adding to the HTML*/
         card.innerHTML =
         '<h2>' + title + '</h2>' +
         '<picture>' +
             '<img src="' + image + '" alt="" width="600" height="600" loading="lazy">' +
         '</picture>';
+
         main.appendChild(card);
+
+        /* Data stored for clustering - TODO */
+
+
     });
 }
 
