@@ -7,13 +7,106 @@ body {
 }
 
 main {
+    width: 98%;
+    margin: 0 auto;
+    padding: 2rem 0;
+
+    display: grid;
+
+    /* Creates a responsive grid of small tiles */
+    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+
+    /* Space between each tile */
+    gap: 0.5rem;
+
+    /* Allows enlarged tiles to appear above the grid cleanly */
+    overflow: visible;
+}
+
+article {
+    position: relative;
+    background: transparent;
+    padding: 0.75rem;
+
+    /* Needed so the title can be positioned inside the tile */
+    position: relative;
+
+    /* Keeps the title overlay inside the tile */
+    overflow: visible;
+
+    /* Slightly shrinks the tile by default */
+    transform: scale(0.96);
+
+    cursor: pointer;
+    z-index: 1;
+}
+
+article img {
+    width: 100%;
+    height: auto;
+
+    /* Keeps the full image visible without cropping */
+    object-fit: contain;
+
+    display: block;
+}
+
+article h2 {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    margin: 0;
+    padding: 0.75rem;
+
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    font-size: 0.55rem;
+    line-height: 1.2;
+
+    /* Hides the title at first */
+    opacity: 0;
+
+    /* Starts the title below the tile so it can slide up */
+
+}
+
+article:hover {
+    /* Makes the hovered tile bigger */
+    transform: scale(3.5);
+
+    /* Adds a shadow so it stands out */
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+
+    /* Brings the hovered tile above neighbouring tiles */
+    z-index: 5;
+}
+
+article:hover h2 {
+    /* Shows the title on hover */
+    opacity: 1;
+
+    /* Slides the title up into view */
+    /*transform: translateY(0);*/
+}
+
+/*body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 16px;
+    background-color: antiquewhite;
+    margin: 0;
+    padding: 0;
+}
+
+main {
     width: 80%;
     margin: 0 auto;
     padding: 2rem 0;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    /*grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 1rem;
-}
+}/*
 
 article {
     background-color: azure;
@@ -31,3 +124,40 @@ article h2 {
     font-size: 0.9rem;
     margin: 0.5rem 0 0;
 }
+main{
+    overflow: visible;
+}
+article{
+    position: relative;
+    overflow: hidden;
+    transform: scale(0.96);
+    cursor: pointer;
+}
+article img{
+    display: block;
+    height: fit-content;
+    width: fit-content;
+}
+article h2{
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: 0;
+    padding: 0.75rem;
+
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+
+    opacity: 0;
+    transform: translateY(100%);
+}
+article:hover{
+    transform: scale(1.06);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+    z-index: 10;
+}
+article:hover h2{
+    opacity: 1;
+    transform: translateY(0);
+}*/
