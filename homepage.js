@@ -1,7 +1,7 @@
-import { classifyImageType, classifyImageMaterial } from './homepage_model.js';
+import { classifyImage } from './homepage_model.js';
 
 
-const apiBase = "https://api.vam.ac.uk/v2/objects/search?id_category=THES48967&id_collection=THES48593&images_exist=1&page_size=10&data_restrict=descriptive_only";
+const apiBase = "https://api.vam.ac.uk/v2/objects/search?id_category=THES48967&id_collection=THES48593&images_exist=1&page_size=30&data_restrict=descriptive_only";
 const imageUrl = "https://framemark.vam.ac.uk/collections";
 const main = document.getElementById('homepage');
 const cacheKey = "va_cluster_cache";
@@ -53,6 +53,7 @@ function buildObjectList(records) {
             date: record._primaryDate,
             place: record._primaryPlace,
             maker: makerName,
+            specificLabel: null,
             cluster: null,
             material: null
         };
@@ -60,6 +61,25 @@ function buildObjectList(records) {
         objectList.push(obj);
     }
     return objectList;
+}
+
+function mapSpecificToCluster(specificLabel) {
+    let vehicleLabels = ["a toy car", "a toy plane", "a toy train", "a toy boat", "a toy truck", "a toy tractor", "a clockwork toy", "a pull-along toy", "a ride-on toy"];
+    let dollLabels = ["a doll", "a baby doll", "a fashion doll", "a paper doll", "a porcelain doll", "a rag doll"];
+    let softToyLabels = ["a teddy bear", "a soft toy", "a stuffed animal"];
+    let actionFigureLabels = ["an action figure", "a toy soldier", "a character toy"];
+    let gameLabels = ["a board game", "a jigsaw puzzle", "a card game"];
+    let dollsHouseLabels = ["a dolls house", "a miniature room", "dolls house furniture"];
+    let accessoryLabels = ["doll clothing", "doll accessories"];
+
+    if (vehicleLabels.indexOf(specificLabel) != -1) { return 'a toy vehicle or mechanical toy'; }
+    if (dollLabels.indexOf(specificLabel) != -1) { return 'a doll'; }
+    if (softToyLabels.indexOf(specificLabel) != -1) { return 'a soft toy or teddy bear'; }
+    if (actionFigureLabels.indexOf(specificLabel) != -1) { return 'an action figure or toy soldier'; }
+    if (gameLabels.indexOf(specificLabel) != -1) { return 'a game or puzzle'; }
+    if (dollsHouseLabels.indexOf(specificLabel) != -1) { return 'a dolls house or miniature room'; }
+    if (accessoryLabels.indexOf(specificLabel) != -1) { return 'doll clothing or doll accessories'; }
+    return 'a toy';
 }
 
 function mapObjectTypeToCluster(objectType) {
@@ -110,6 +130,7 @@ function saveCache(objectList) {
     let cache = {};
     for (let i = 0; i < objectList.length; i++) {
         cache[objectList[i].systemNumber] = {
+            specificLabel: objectList[i].specificLabel,
             cluster: objectList[i].cluster,
             material: objectList[i].material
         };
@@ -121,6 +142,7 @@ function applyCache(objectList, cache) {
     for (let i = 0; i < objectList.length; i++) {
         let cached = cache[objectList[i].systemNumber];
         if (cached) {
+            objectList[i].specificLabel = cached.specificLabel;
             objectList[i].cluster = cached.cluster;
             objectList[i].material = cached.material;
         }
@@ -136,28 +158,24 @@ function isMaterialCached(cache) {
     return false;
 }
 
-async function classifyObjects(objectList) {
+async function classifyAll(objectList) {
     for (let i = 0; i < objectList.length; i++) {
         let imgSrc = imageUrl + "/" + objectList[i].imageId + "/full/!400,400/0/default.jpg";
         try {
-            objectList[i].cluster = await classifyImageType(imgSrc);
+            let result = await classifyImage(imgSrc);
+            objectList[i].specificLabel = result.specificLabel;
+            objectList[i].cluster = mapSpecificToCluster(result.specificLabel);
+            objectList[i].material = result.material;
         } catch (error) {
-            console.error('Type classification error:', error);
+            console.error('Classification error:', error);
         }
-        console.log('Type ' + (i + 1) + ' / ' + objectList.length + ': ' + objectList[i].cluster);
-    }
-}
-
-async function classifyMaterials(objectList) {
-    for (let i = 0; i < objectList.length; i++) {
-        let imgSrc = imageUrl + "/" + objectList[i].imageId + "/full/!400,400/0/default.jpg";
-        try {
-            objectList[i].material = await classifyImageMaterial(imgSrc);
-        } catch (error) {
-            console.error('Material classification error:', error);
-            objectList[i].material = 'unknown';
-        }
-        console.log('Material ' + (i + 1) + ' / ' + objectList.length + ': ' + objectList[i].material);
+        console.log(
+            (i + 1) + ' / ' + objectList.length + ' | ' +
+            'API: ' + objectList[i].objectType + ' | ' +
+            'AI: ' + objectList[i].specificLabel + ' | ' +
+            'Cluster: ' + objectList[i].cluster + ' | ' +
+            'Material: ' + objectList[i].material
+        );
     }
 }
 
@@ -183,22 +201,21 @@ async function displayObjects() {
     const records = await fetchData();
     const objectList = buildObjectList(records);
 
+    /* TESTING: cache disabled — re-enable for production
     const cache = loadCache();
     if (cache != null) {
         console.log('Using cached labels');
         applyCache(objectList, cache);
         renderCards(objectList);
-    } else {
+    } else { */
         applyObjectTypeMapping(objectList);
         renderCards(objectList);
-        console.log('Running AI type classification in background...');
-        await classifyObjects(objectList);
+        console.log('Running AI classification in background...');
+        await classifyAll(objectList);
         renderCards(objectList);
-        console.log('Running material classification in background...');
-        await classifyMaterials(objectList);
         saveCache(objectList);
         console.log('All done — results cached');
-    }
+    /* } */
 }
 
 displayObjects();

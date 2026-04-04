@@ -1,13 +1,35 @@
-import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers";
+import { pipeline } from "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2";
 
-const typeLabels = [
+const specificTypeLabels = [
+    "a toy car",
+    "a toy plane",
+    "a toy train",
+    "a toy boat",
+    "a toy truck",
+    "a toy tractor",
+    "a clockwork toy",
+    "a pull-along toy",
+    "a ride-on toy",
     "a doll",
-    "a soft toy or teddy bear",
-    "an action figure or toy soldier",
-    "a toy vehicle or mechanical toy",
-    "a game or puzzle",
-    "a dolls house or miniature room",
-    "doll clothing or doll accessories"
+    "a baby doll",
+    "a fashion doll",
+    "a paper doll",
+    "a porcelain doll",
+    "a rag doll",
+    "a teddy bear",
+    "a soft toy",
+    "a stuffed animal",
+    "an action figure",
+    "a toy soldier",
+    "a character toy",
+    "a board game",
+    "a jigsaw puzzle",
+    "a card game",
+    "a dolls house",
+    "a miniature room",
+    "dolls house furniture",
+    "doll clothing",
+    "doll accessories"
 ];
 
 const materialLabels = [
@@ -19,41 +41,45 @@ const materialLabels = [
     "a ceramic or porcelain toy"
 ];
 
+const allLabels = specificTypeLabels.concat(materialLabels);
+
 let detector = null;
 
 async function loadDetector() {
     if (detector == null) {
-        detector = await pipeline("zero-shot-object-detection", "Xenova/owlvit-base-patch32");
+        detector = await pipeline("zero-shot-object-detection", "Xenova/owlvit-base-patch32", { dtype: "q8" });
     }
     return detector;
 }
 
-async function classifyImageType(imageUrl) {
+async function classifyImage(imageUrl) {
     const pipe = await loadDetector();
-    const results = await pipe(imageUrl, typeLabels);
-    let topScore = -1;
-    let topLabel = typeLabels[0];
-    for (let i = 0; i < results.length; i++) {
-        if (results[i].score > topScore) {
-            topScore = results[i].score;
-            topLabel = results[i].label;
-        }
-    }
-    return topLabel;
-}
+    const results = await pipe(imageUrl, allLabels);
 
-async function classifyImageMaterial(imageUrl) {
-    const pipe = await loadDetector();
-    const results = await pipe(imageUrl, materialLabels);
-    let topScore = -1;
-    let topLabel = materialLabels[0];
+    let topTypeScore = -1;
+    let topTypeLabel = specificTypeLabels[0];
+    let topMaterialScore = -1;
+    let topMaterialLabel = materialLabels[0];
+
     for (let i = 0; i < results.length; i++) {
-        if (results[i].score > topScore) {
-            topScore = results[i].score;
-            topLabel = results[i].label;
+        let label = results[i].label;
+        let score = results[i].score;
+
+        if (specificTypeLabels.indexOf(label) != -1) {
+            if (score > topTypeScore) {
+                topTypeScore = score;
+                topTypeLabel = label;
+            }
+        }
+        if (materialLabels.indexOf(label) != -1) {
+            if (score > topMaterialScore) {
+                topMaterialScore = score;
+                topMaterialLabel = label;
+            }
         }
     }
-    return topLabel;
+
+    return { specificLabel: topTypeLabel, material: topMaterialLabel };
 }
 
 async function detectObjects(imageUrl, labels) {
@@ -61,4 +87,4 @@ async function detectObjects(imageUrl, labels) {
     return await pipe(imageUrl, labels);
 }
 
-export { classifyImageType, classifyImageMaterial, detectObjects };
+export { classifyImage, detectObjects };
