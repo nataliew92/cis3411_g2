@@ -1,49 +1,14 @@
-import { pipeline } from "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2";
+import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers";
 
-const specificTypeLabels = [
-    "a toy car",
-    "a toy plane",
-    "a toy train",
-    "a toy boat",
-    "a toy truck",
-    "a toy tractor",
-    "a clockwork toy",
-    "a pull-along toy",
-    "a ride-on toy",
-    "a doll",
-    "a baby doll",
-    "a fashion doll",
-    "a paper doll",
-    "a porcelain doll",
-    "a rag doll",
-    "a teddy bear",
-    "a soft toy",
-    "a stuffed animal",
-    "an action figure",
-    "a toy soldier",
-    "a character toy",
-    "a board game",
-    "a jigsaw puzzle",
-    "a card game",
-    "a dolls house",
-    "a miniature room",
-    "dolls house furniture",
-    "doll clothing",
-    "doll accessories"
-];
-
-const materialLabels = [
-    "a plastic toy",
-    "a wooden toy",
-    "a metal toy",
-    "a fabric or cloth toy",
-    "a paper toy",
-    "a ceramic or porcelain toy"
-];
-
-const allLabels = specificTypeLabels.concat(materialLabels);
-
+let classifier = null;
 let detector = null;
+
+async function loadClassifier() {
+    if (classifier == null) {
+        classifier = await pipeline("zero-shot-image-classification", "Xenova/clip-vit-base-patch32");
+    }
+    return classifier;
+}
 
 async function loadDetector() {
     if (detector == null) {
@@ -52,30 +17,28 @@ async function loadDetector() {
     return detector;
 }
 
-async function classifyImage(imageUrl) {
-    const pipe = await loadDetector();
+async function classifyImage(imageUrl, typeLabels, materialLabels) {
+    const pipe = await loadClassifier();
+    const allLabels = typeLabels.concat(materialLabels);
     const results = await pipe(imageUrl, allLabels);
 
-    let topTypeScore = -1;
-    let topTypeLabel = specificTypeLabels[0];
-    let topMaterialScore = -1;
+    let topTypeLabel = typeLabels[0];
     let topMaterialLabel = materialLabels[0];
+    let typeFound = false;
+    let materialFound = false;
 
     for (let i = 0; i < results.length; i++) {
         let label = results[i].label;
-        let score = results[i].score;
-
-        if (specificTypeLabels.indexOf(label) != -1) {
-            if (score > topTypeScore) {
-                topTypeScore = score;
-                topTypeLabel = label;
-            }
+        if (typeFound == false && typeLabels.indexOf(label) != -1) {
+            topTypeLabel = label;
+            typeFound = true;
         }
-        if (materialLabels.indexOf(label) != -1) {
-            if (score > topMaterialScore) {
-                topMaterialScore = score;
-                topMaterialLabel = label;
-            }
+        if (materialFound == false && materialLabels.indexOf(label) != -1) {
+            topMaterialLabel = label;
+            materialFound = true;
+        }
+        if (typeFound && materialFound) {
+            break;
         }
     }
 
