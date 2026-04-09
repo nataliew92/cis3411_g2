@@ -10,16 +10,14 @@ main {
     width: 98%;
     margin: 0 auto;
     padding: 2rem 0;
+}
 
-    display: grid;
-
-    /* Creates a responsive grid of small tiles */
-    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
-
-    /* Space between each tile */
+section[data-initial-cluster],
+section[data-cluster] {
+    display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
-
-    /* Allows enlarged tiles to appear above the grid cleanly */
+    margin-bottom: 2rem;
     overflow: visible;
 }
 

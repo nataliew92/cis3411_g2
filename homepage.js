@@ -93,6 +93,8 @@ let activeMaterial = null;
 let searchText = '';
 let currentObjectList = [];
 let cardMap = {};
+let cloudAreaEl = null;
+let initialGridEl = null;
 
 async function fetchData() {
     let allObjects = [];
@@ -207,10 +209,10 @@ function renderFilterButtons(mode) {
     }
 }
 
-function updateResultsStatus(count) {
+function updateResultsStatus(message) {
     let status = document.getElementById('results-status');
     if (status != null) {
-        status.textContent = count + ' objects shown';
+        status.textContent = message;
     }
 }
 
@@ -287,6 +289,15 @@ function mapObjectTypeToCluster(objectType) {
     return 'a toy';
 }
 
+function shuffleArray(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var temp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = temp;
+    }
+}
+
 function applyObjectTypeMapping(objectList) {
     for (let i = 0; i < objectList.length; i++) {
         objectList[i].cluster = mapObjectTypeToCluster(objectList[i].objectType);
@@ -351,6 +362,8 @@ async function classifyAll(objectList) {
             'Cluster: ' + objectList[i].cluster + ' | ' +
             'Material: ' + objectList[i].material
         );
+        moveCardToCloud(objectList[i]);
+        updateResultsStatus('AI classifying — ' + (i + 1) + ' / ' + objectList.length + ' done...');
     }
 }
 
@@ -368,33 +381,87 @@ function createCard(obj) {
     return card;
 }
 
-function renderCards(objectList) {
+function createGroupSection(key, dataAttrName) {
+    let sec = document.createElement('section');
+    sec.setAttribute(dataAttrName, key);
+    let heading = document.createElement('h2');
+    heading.textContent = clusterDisplayNames[key] || key;
+    sec.appendChild(heading);
+    return sec;
+}
+
+function renderInitialGrid(objectList) {
+    let groups = {};
     for (let i = 0; i < objectList.length; i++) {
+        let key = objectList[i].cluster || 'a toy';
+        if (groups[key] == null) {
+            groups[key] = [];
+        }
+        groups[key].push(objectList[i]);
+    }
+    let keys = Object.keys(groups);
+    for (let i = 0; i < keys.length; i++) {
+        let key = keys[i];
+        let items = groups[key];
+        let sec = createGroupSection(key, 'data-initial-cluster');
+        for (let j = 0; j < items.length; j++) {
+            let obj = items[j];
+            if (cardMap[obj.systemNumber] == null) {
+                cardMap[obj.systemNumber] = createCard(obj);
+            }
+            sec.appendChild(cardMap[obj.systemNumber]);
+        }
+        initialGridEl.appendChild(sec);
+    }
+}
+
+function getOrCreateCloudSection(clusterKey) {
+    let sections = cloudAreaEl.querySelectorAll('section');
+    for (let i = 0; i < sections.length; i++) {
+        if (sections[i].getAttribute('data-cluster') == clusterKey) {
+            return sections[i];
+        }
+    }
+    let sec = createGroupSection(clusterKey, 'data-cluster');
+    cloudAreaEl.appendChild(sec);
+    return sec;
+}
+
+function moveCardToCloud(obj) {
+    let cloudSection = getOrCreateCloudSection(obj.cluster);
+    let card = cardMap[obj.systemNumber];
+    let p = card.querySelector('p');
+    if (p != null) {
+        p.textContent = obj.specificLabel || obj.cluster || '';
+    }
+    cloudSection.appendChild(card);
+}
+
+// TODO: renderCards is still used by search/filter — will be replaced in the cloud layout task
+function renderCards(objectList) {
+    for (var i = 0; i < objectList.length; i++) {
         if (cardMap[objectList[i].systemNumber] == null) {
             cardMap[objectList[i].systemNumber] = createCard(objectList[i]);
         }
     }
-
     while (main.firstChild) {
         main.removeChild(main.firstChild);
     }
-
-    for (let i = 0; i < objectList.length; i++) {
-        let obj = objectList[i];
-        let card = cardMap[obj.systemNumber];
-        let p = card.querySelector('p');
+    for (var i = 0; i < objectList.length; i++) {
+        var obj = objectList[i];
+        var card = cardMap[obj.systemNumber];
+        var p = card.querySelector('p');
         if (p != null) {
             p.textContent = obj.cluster || '';
         }
         main.appendChild(card);
     }
-
-    updateResultsStatus(objectList.length);
 }
 
 async function displayObjects() {
     const records = await fetchData();
     const objectList = buildObjectList(records);
+    shuffleArray(objectList);
 
     currentObjectList = objectList;
     setupFilters();
@@ -406,14 +473,24 @@ async function displayObjects() {
         applyCache(objectList, cache);
         renderCards(getFilteredList(currentObjectList));
     } else { */
+        cloudAreaEl = document.createElement('section');
+        initialGridEl = document.createElement('section');
+        main.appendChild(cloudAreaEl);
+        main.appendChild(initialGridEl);
+
         applyObjectTypeMapping(objectList);
-        renderCards(getFilteredList(currentObjectList));
+        renderInitialGrid(objectList);
+        updateResultsStatus(objectList.length + ' objects shown — initial grouping by object type. AI is now refining clusters...');
+
         let startTime = Date.now();
         console.log('Running AI classification in background... ' + new Date().toLocaleTimeString());
         await classifyAll(objectList);
         let elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-        renderCards(getFilteredList(currentObjectList));
+
+        main.removeChild(initialGridEl);
+        initialGridEl = null;
         saveCache(objectList);
+        updateResultsStatus(objectList.length + ' objects — AI clustering complete. (' + elapsed + 's)');
         console.log('All done — results cached. Time taken: ' + elapsed + 's');
     /* } */
 }

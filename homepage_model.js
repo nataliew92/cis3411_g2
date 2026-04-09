@@ -1,14 +1,6 @@
-import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers";
+import { pipeline } from "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2";
 
-let classifier = null;
 let detector = null;
-
-async function loadClassifier() {
-    if (classifier == null) {
-        classifier = await pipeline("zero-shot-image-classification", "Xenova/clip-vit-base-patch32");
-    }
-    return classifier;
-}
 
 async function loadDetector() {
     if (detector == null) {
@@ -18,27 +10,41 @@ async function loadDetector() {
 }
 
 async function classifyImage(imageUrl, typeLabels, materialLabels) {
-    const pipe = await loadClassifier();
+    const pipe = await loadDetector();
     const allLabels = typeLabels.concat(materialLabels);
-    const results = await pipe(imageUrl, allLabels);
 
-    let topTypeLabel = typeLabels[0];
-    let topMaterialLabel = materialLabels[0];
-    let typeFound = false;
-    let materialFound = false;
+    // Very low threshold so every label gets a score back
+    const results = await pipe(imageUrl, allLabels, { threshold: 0.01, top_k: allLabels.length });
 
-    for (let i = 0; i < results.length; i++) {
-        let label = results[i].label;
-        if (typeFound == false && typeLabels.indexOf(label) != -1) {
-            topTypeLabel = label;
-            typeFound = true;
+    // For each label, keep only its highest score across all detections
+    var labelScores = {};
+    for (var i = 0; i < results.length; i++) {
+        var label = results[i].label;
+        var score = results[i].score;
+        if (labelScores[label] == null || score > labelScores[label]) {
+            labelScores[label] = score;
         }
-        if (materialFound == false && materialLabels.indexOf(label) != -1) {
-            topMaterialLabel = label;
-            materialFound = true;
+    }
+
+    // Pick the type label with the highest score
+    var topTypeLabel = typeLabels[0];
+    var topTypeScore = -1;
+    for (var i = 0; i < typeLabels.length; i++) {
+        var s = labelScores[typeLabels[i]] || 0;
+        if (s > topTypeScore) {
+            topTypeScore = s;
+            topTypeLabel = typeLabels[i];
         }
-        if (typeFound && materialFound) {
-            break;
+    }
+
+    // Pick the material label with the highest score
+    var topMaterialLabel = materialLabels[0];
+    var topMaterialScore = -1;
+    for (var i = 0; i < materialLabels.length; i++) {
+        var s = labelScores[materialLabels[i]] || 0;
+        if (s > topMaterialScore) {
+            topMaterialScore = s;
+            topMaterialLabel = materialLabels[i];
         }
     }
 
