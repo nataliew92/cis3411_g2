@@ -344,6 +344,50 @@ function isMaterialCached(cache) {
     return false;
 }
 
+function delay(ms) {
+    return new Promise(function(resolve) { setTimeout(resolve, ms); });
+}
+
+async function movePreClustered(objectList) {
+    for (let i = 0; i < objectList.length; i++) {
+        moveCardToCloud(objectList[i]);
+        updateResultsStatus('Loading — ' + (i + 1) + ' / ' + objectList.length + ' placed...');
+        await delay(80);
+    }
+}
+
+function exportClusters(objectList) {
+    let data = {};
+    for (let i = 0; i < objectList.length; i++) {
+        let obj = objectList[i];
+        if (obj.specificLabel != null) {
+            data[obj.systemNumber] = {
+                specificLabel: obj.specificLabel,
+                cluster: obj.cluster,
+                material: obj.material
+            };
+        }
+    }
+    let json = JSON.stringify(data, null, 2);
+    let blob = new Blob([json], { type: 'application/json' });
+    let url = URL.createObjectURL(blob);
+    let a = document.createElement('a');
+    a.href = url;
+    a.download = 'clusters.json';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+async function fetchPreClusters() {
+    try {
+        let response = await fetch('clusters.json');
+        if (!response.ok) { return null; }
+        return await response.json();
+    } catch (error) {
+        return null;
+    }
+}
+
 async function classifyAll(objectList) {
     for (let i = 0; i < objectList.length; i++) {
         let imgSrc = imageUrl + "/" + objectList[i].imageId + "/full/!400,400/0/default.jpg";
@@ -364,6 +408,7 @@ async function classifyAll(objectList) {
         );
         moveCardToCloud(objectList[i]);
         updateResultsStatus('AI classifying — ' + (i + 1) + ' / ' + objectList.length + ' done...');
+        saveCache(currentObjectList);
     }
 }
 
@@ -466,33 +511,57 @@ async function displayObjects() {
     currentObjectList = objectList;
     setupFilters();
 
-    /* TESTING: cache disabled — re-enable for production
-    const cache = loadCache();
-    if (cache != null) {
-        console.log('Using cached labels');
-        applyCache(objectList, cache);
-        renderCards(getFilteredList(currentObjectList));
-    } else { */
-        cloudAreaEl = document.createElement('section');
-        initialGridEl = document.createElement('section');
-        main.appendChild(cloudAreaEl);
-        main.appendChild(initialGridEl);
+    cloudAreaEl = document.createElement('section');
+    initialGridEl = document.createElement('section');
+    main.appendChild(cloudAreaEl);
+    main.appendChild(initialGridEl);
 
-        applyObjectTypeMapping(objectList);
-        renderInitialGrid(objectList);
+    applyObjectTypeMapping(objectList);
+
+    let preClusters = await fetchPreClusters();
+    if (preClusters != null) {
+        applyCache(objectList, preClusters);
+    }
+
+    renderInitialGrid(objectList);
+
+    let preclustered = [];
+    let unclassified = [];
+    for (let i = 0; i < objectList.length; i++) {
+        if (objectList[i].specificLabel != null) {
+            preclustered.push(objectList[i]);
+        } else {
+            unclassified.push(objectList[i]);
+        }
+    }
+
+    if (preclustered.length > 0) {
+        updateResultsStatus(preclustered.length + ' objects pre-clustered, AI classifying ' + unclassified.length + ' remaining...');
+        await movePreClustered(preclustered);
+    } else {
         updateResultsStatus(objectList.length + ' objects shown — initial grouping by object type. AI is now refining clusters...');
+    }
 
+    if (unclassified.length > 0) {
         let startTime = Date.now();
-        console.log('Running AI classification in background... ' + new Date().toLocaleTimeString());
-        await classifyAll(objectList);
+        console.log('Running AI classification... ' + new Date().toLocaleTimeString());
+        await classifyAll(unclassified);
         let elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        console.log('AI done. Time taken: ' + elapsed + 's');
+    }
 
-        main.removeChild(initialGridEl);
-        initialGridEl = null;
-        saveCache(objectList);
-        updateResultsStatus(objectList.length + ' objects — AI clustering complete. (' + elapsed + 's)');
-        console.log('All done — results cached. Time taken: ' + elapsed + 's');
-    /* } */
+    main.removeChild(initialGridEl);
+    initialGridEl = null;
+    saveCache(objectList);
+    updateResultsStatus(objectList.length + ' objects — clustering complete.');
+
+    let exportBtn = document.getElementById('btn-export');
+    if (exportBtn != null) {
+        exportBtn.disabled = false;
+        exportBtn.addEventListener('click', function() {
+            exportClusters(currentObjectList);
+        });
+    }
 }
 
 displayObjects();
