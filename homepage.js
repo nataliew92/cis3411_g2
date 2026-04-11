@@ -1,7 +1,7 @@
 import { classifyImage } from './homepage_model.js';
 
 
-const apiBase = "https://api.vam.ac.uk/v2/objects/search?id_category=THES48967&id_collection=THES48593&images_exist=1&page_size=30&data_restrict=descriptive_only";
+const apiBase = "https://api.vam.ac.uk/v2/objects/search?id_category=THES48967&id_collection=THES48593&images_exist=1&page_size=100&data_restrict=descriptive_only";
 const imageUrl = "https://framemark.vam.ac.uk/collections";
 const main = document.getElementById('homepage');
 const cacheKey = "va_cluster_cache";
@@ -29,7 +29,11 @@ const specificTypeLabels = [
     "a stuffed animal",
     "an action figure",
     "a toy soldier",
-    "a character toy",
+    "a soft character toy",
+    "a character doll",
+    "a plush toy",
+    "a puppet",
+    "a marionette",
     "a board game",
     "a jigsaw puzzle",
     "a card game",
@@ -54,6 +58,7 @@ const clusterLabels = [
     'a doll',
     'a soft toy or teddy bear',
     'an action figure or toy soldier',
+    'a puppet or marionette',
     'a game or puzzle',
     'a dolls house or miniature room',
     'doll clothing or doll accessories'
@@ -73,6 +78,7 @@ const clusterDisplayNames = {
     'a doll': 'Dolls',
     'a soft toy or teddy bear': 'Soft Toys',
     'an action figure or toy soldier': 'Action Figures',
+    'a puppet or marionette': 'Puppets',
     'a game or puzzle': 'Games & Puzzles',
     'a dolls house or miniature room': "Dolls' Houses",
     'doll clothing or doll accessories': 'Doll Accessories'
@@ -87,19 +93,18 @@ const materialDisplayNames = {
     'a ceramic or porcelain toy': 'Ceramic'
 };
 
-let activeMode = null;
 let activeCluster = null;
 let activeMaterial = null;
 let searchText = '';
 let currentObjectList = [];
 let cardMap = {};
 let cloudAreaEl = null;
-let initialGridEl = null;
+let pendingEl = null;
 
 async function fetchData() {
     let allObjects = [];
     let page = 1;
-    while (page < 2) {
+    while (page < 9) {
         const URL = apiBase + '&page=' + page;
         try {
             const response = await fetch(URL);
@@ -242,9 +247,10 @@ function setupFilters() {
 
 function mapSpecificToCluster(specificLabel) {
     let vehicleLabels = ["a toy car", "a toy plane", "a toy train", "a toy boat", "a toy truck", "a toy tractor", "a clockwork toy", "a pull-along toy", "a ride-on toy"];
-    let dollLabels = ["a doll", "a baby doll", "a fashion doll", "a paper doll", "a porcelain doll", "a rag doll"];
-    let softToyLabels = ["a teddy bear", "a soft toy", "a stuffed animal"];
-    let actionFigureLabels = ["an action figure", "a toy soldier", "a character toy"];
+    let dollLabels = ["a doll", "a baby doll", "a fashion doll", "a paper doll", "a porcelain doll", "a rag doll", "a character doll"];
+    let softToyLabels = ["a teddy bear", "a soft toy", "a stuffed animal", "a soft character toy", "a plush toy"];
+    let actionFigureLabels = ["an action figure", "a toy soldier"];
+    let puppetLabels = ["a puppet", "a marionette"];
     let gameLabels = ["a board game", "a jigsaw puzzle", "a card game"];
     let dollsHouseLabels = ["a dolls house", "a miniature room", "dolls house furniture"];
     let accessoryLabels = ["doll clothing", "doll accessories"];
@@ -253,6 +259,7 @@ function mapSpecificToCluster(specificLabel) {
     if (dollLabels.indexOf(specificLabel) != -1) { return 'a doll'; }
     if (softToyLabels.indexOf(specificLabel) != -1) { return 'a soft toy or teddy bear'; }
     if (actionFigureLabels.indexOf(specificLabel) != -1) { return 'an action figure or toy soldier'; }
+    if (puppetLabels.indexOf(specificLabel) != -1) { return 'a puppet or marionette'; }
     if (gameLabels.indexOf(specificLabel) != -1) { return 'a game or puzzle'; }
     if (dollsHouseLabels.indexOf(specificLabel) != -1) { return 'a dolls house or miniature room'; }
     if (accessoryLabels.indexOf(specificLabel) != -1) { return 'doll clothing or doll accessories'; }
@@ -276,6 +283,9 @@ function mapObjectTypeToCluster(objectType) {
     }
     if (type.indexOf('teddy') != -1 || type.indexOf('soft toy') != -1) {
         return 'a soft toy or teddy bear';
+    }
+    if (type.indexOf('puppet') != -1 || type.indexOf('marionette') != -1) {
+        return 'a puppet or marionette';
     }
     if (type.indexOf('soldier') != -1 || type.indexOf('action figure') != -1 || type == 'figure') {
         return 'an action figure or toy soldier';
@@ -304,13 +314,6 @@ function applyObjectTypeMapping(objectList) {
     }
 }
 
-function loadCache() {
-    let stored = localStorage.getItem(cacheKey);
-    if (stored == null) {
-        return null;
-    }
-    return JSON.parse(stored);
-}
 
 function saveCache(objectList) {
     let cache = {};
@@ -335,20 +338,13 @@ function applyCache(objectList, cache) {
     }
 }
 
-function isMaterialCached(cache) {
-    for (let key in cache) {
-        if (cache[key].material != null) {
-            return true;
-        }
-    }
-    return false;
-}
 
 function delay(ms) {
     return new Promise(function(resolve) { setTimeout(resolve, ms); });
 }
 
 async function movePreClustered(objectList) {
+    console.log('Moving ' + objectList.length + ' objects with pre-assigned cluster values into visual clouds...');
     for (let i = 0; i < objectList.length; i++) {
         moveCardToCloud(objectList[i]);
         updateResultsStatus('Loading — ' + (i + 1) + ' / ' + objectList.length + ' placed...');
@@ -390,23 +386,20 @@ async function fetchPreClusters() {
 
 async function classifyAll(objectList) {
     for (let i = 0; i < objectList.length; i++) {
-        let imgSrc = imageUrl + "/" + objectList[i].imageId + "/full/!400,400/0/default.jpg";
+        let obj = objectList[i];
+        let imgSrc = imageUrl + "/" + obj.imageId + "/full/!400,400/0/default.jpg";
         try {
             let result = await classifyImage(imgSrc, specificTypeLabels, materialLabels);
-            objectList[i].specificLabel = result.specificLabel;
-            objectList[i].cluster = mapSpecificToCluster(result.specificLabel);
-            objectList[i].material = result.material;
+            obj.specificLabel = result.specificLabel;
+            obj.cluster = mapSpecificToCluster(result.specificLabel);
+            obj.material = result.material;
         } catch (error) {
-            console.error('Classification error:', error);
+            console.error('Classification error for "' + obj.title + '":', error);
         }
-        console.log(
-            (i + 1) + ' / ' + objectList.length + ' | ' +
-            'API: ' + objectList[i].objectType + ' | ' +
-            'AI: ' + objectList[i].specificLabel + ' | ' +
-            'Cluster: ' + objectList[i].cluster + ' | ' +
-            'Material: ' + objectList[i].material
-        );
-        moveCardToCloud(objectList[i]);
+        console.log('Assigning a cluster to: "' + obj.title + '" (' + (i + 1) + ' of ' + objectList.length + ')');
+        let clusterName = clusterDisplayNames[obj.cluster] || obj.cluster;
+        console.log('Moving "' + obj.title + '" to cloud: ' + clusterName + ' (identified as: ' + obj.specificLabel + ')');
+        moveCardToCloud(obj);
         updateResultsStatus('AI classifying — ' + (i + 1) + ' / ' + objectList.length + ' done...');
         saveCache(currentObjectList);
     }
@@ -435,29 +428,25 @@ function createGroupSection(key, dataAttrName) {
     return sec;
 }
 
-function renderInitialGrid(objectList) {
-    let groups = {};
-    for (let i = 0; i < objectList.length; i++) {
-        let key = objectList[i].cluster || 'a toy';
-        if (groups[key] == null) {
-            groups[key] = [];
+function renderPendingSection(unclassified, allObjects) {
+    for (let i = 0; i < allObjects.length; i++) {
+        if (cardMap[allObjects[i].systemNumber] == null) {
+            cardMap[allObjects[i].systemNumber] = createCard(allObjects[i]);
         }
-        groups[key].push(objectList[i]);
     }
-    let keys = Object.keys(groups);
-    for (let i = 0; i < keys.length; i++) {
-        let key = keys[i];
-        let items = groups[key];
-        let sec = createGroupSection(key, 'data-initial-cluster');
-        for (let j = 0; j < items.length; j++) {
-            let obj = items[j];
-            if (cardMap[obj.systemNumber] == null) {
-                cardMap[obj.systemNumber] = createCard(obj);
-            }
-            sec.appendChild(cardMap[obj.systemNumber]);
-        }
-        initialGridEl.appendChild(sec);
+    let heading = document.createElement('h2');
+    heading.textContent = 'AI is classifying these...';
+    pendingEl.appendChild(heading);
+    for (let i = 0; i < unclassified.length; i++) {
+        pendingEl.appendChild(cardMap[unclassified[i].systemNumber]);
     }
+}
+
+function collapsePending() {
+    if (pendingEl == null) { return; }
+    console.log('All objects clustered — removing pending section.');
+    pendingEl.parentNode.removeChild(pendingEl);
+    pendingEl = null;
 }
 
 function getOrCreateCloudSection(clusterKey) {
@@ -511,10 +500,11 @@ async function displayObjects() {
     currentObjectList = objectList;
     setupFilters();
 
+    pendingEl = document.createElement('section');
+    pendingEl.setAttribute('data-pending', 'true');
     cloudAreaEl = document.createElement('section');
-    initialGridEl = document.createElement('section');
+    main.appendChild(pendingEl);
     main.appendChild(cloudAreaEl);
-    main.appendChild(initialGridEl);
 
     applyObjectTypeMapping(objectList);
 
@@ -522,8 +512,6 @@ async function displayObjects() {
     if (preClusters != null) {
         applyCache(objectList, preClusters);
     }
-
-    renderInitialGrid(objectList);
 
     let preclustered = [];
     let unclassified = [];
@@ -535,12 +523,13 @@ async function displayObjects() {
         }
     }
 
-    if (preclustered.length > 0) {
-        updateResultsStatus(preclustered.length + ' objects pre-clustered, AI classifying ' + unclassified.length + ' remaining...');
-        await movePreClustered(preclustered);
-    } else {
-        updateResultsStatus(objectList.length + ' objects shown — initial grouping by object type. AI is now refining clusters...');
+    renderPendingSection(unclassified, objectList);
+
+    if (unclassified.length > 0) {
+        updateResultsStatus(unclassified.length + ' objects being classified by AI...');
     }
+
+    await movePreClustered(preclustered);
 
     if (unclassified.length > 0) {
         let startTime = Date.now();
@@ -550,8 +539,7 @@ async function displayObjects() {
         console.log('AI done. Time taken: ' + elapsed + 's');
     }
 
-    main.removeChild(initialGridEl);
-    initialGridEl = null;
+    collapsePending();
     saveCache(objectList);
     updateResultsStatus(objectList.length + ' objects — clustering complete.');
 
