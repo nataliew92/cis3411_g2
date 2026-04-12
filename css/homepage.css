@@ -20,12 +20,37 @@ section[data-pending] {
     overflow: visible;
 }
 
-section[data-cluster] {
+section[data-cloud-area] {
+    position: relative;
+    width: 100%;
+}
+
+section[data-cluster],
+section[data-material] {
+    position: absolute;
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-bottom: 2rem;
+    gap: 0.4rem;
     overflow: visible;
+    background: rgba(255, 255, 255, 0.45);
+    border-radius: 1rem;
+    padding: 0.6rem;
+}
+
+section[data-cluster] > h2,
+section[data-material] > h2 {
+    width: 100%;
+    margin: 0 0 0.4rem;
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: #333;
+}
+
+section[data-cluster][data-active="true"],
+section[data-material][data-active="true"] {
+    transform: scale(1.4);
+    z-index: 10;
+    transform-origin: center;
 }
 
 article {
@@ -94,6 +119,33 @@ article:hover h2 {
 
     /* Slides the title up into view */
     /*transform: translateY(0);*/
+}
+
+article {
+    width: 76px;
+    height: 76px;
+    overflow: hidden;
+    padding: 0;
+}
+
+article img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+article p {
+    display: none;
+}
+
+article:hover {
+    z-index: 20;
+}
+
+article[data-classifying="true"] {
+    outline: 3px solid #e8541a;
+    outline-offset: 2px;
+    z-index: 2;
 }
 
 /*body {

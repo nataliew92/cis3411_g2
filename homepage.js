@@ -93,8 +93,8 @@ const materialDisplayNames = {
     'a ceramic or porcelain toy': 'Ceramic'
 };
 
-let activeCluster = null;
-let activeMaterial = null;
+let groupingMode = 'category';
+let activeGroup = null;
 let searchText = '';
 let currentObjectList = [];
 let cardMap = {};
@@ -158,56 +158,26 @@ function buildObjectList(records) {
     return objectList;
 }
 
-function getFilteredList(objectList) {
-    let filtered = [];
-    for (let i = 0; i < objectList.length; i++) {
-        let obj = objectList[i];
-        let matchesCluster = activeCluster == null || obj.cluster == activeCluster;
-        let matchesMaterial = activeMaterial == null || obj.material == activeMaterial;
-        let matchesSearch = searchText == '' || (obj.specificLabel != null && obj.specificLabel.indexOf(searchText) != -1);
-        if (matchesCluster && matchesMaterial && matchesSearch) {
-            filtered.push(obj);
-        }
-    }
-    return filtered;
-}
 
 function renderFilterButtons(mode) {
     filterOptions.innerHTML = '';
-    activeMode = mode;
 
-    let labels = mode == 'category' ? clusterLabels : materialFilterLabels;
-    let displayNames = mode == 'category' ? clusterDisplayNames : materialDisplayNames;
+    var labels = mode == 'category' ? clusterLabels : materialFilterLabels;
+    var displayNames = mode == 'category' ? clusterDisplayNames : materialDisplayNames;
 
-    for (let i = 0; i < labels.length; i++) {
-        let btn = document.createElement('button');
+    for (var i = 0; i < labels.length; i++) {
+        var btn = document.createElement('button');
         btn.textContent = displayNames[labels[i]];
         btn.dataset.value = labels[i];
-
         btn.setAttribute('aria-pressed', 'false');
 
-        let label = labels[i];
         btn.addEventListener('click', function() {
-            if (mode == 'category') {
-                if (activeCluster == label) {
-                    activeCluster = null;
-                } else {
-                    activeCluster = label;
-                }
-            } else {
-                if (activeMaterial == label) {
-                    activeMaterial = null;
-                } else {
-                    activeMaterial = label;
-                }
+            var key = this.dataset.value;
+            scrollToCloud(key);
+            var allBtns = filterOptions.querySelectorAll('button');
+            for (var j = 0; j < allBtns.length; j++) {
+                allBtns[j].setAttribute('aria-pressed', allBtns[j].dataset.value == activeGroup ? 'true' : 'false');
             }
-            let allBtns = filterOptions.querySelectorAll('button');
-            for (let j = 0; j < allBtns.length; j++) {
-                let val = allBtns[j].dataset.value;
-                let isActive = (mode == 'category' && val == activeCluster) || (mode == 'material' && val == activeMaterial);
-                allBtns[j].setAttribute('aria-pressed', isActive ? 'true' : 'false');
-            }
-            renderCards(getFilteredList(currentObjectList));
         });
 
         filterOptions.appendChild(btn);
@@ -221,14 +191,130 @@ function updateResultsStatus(message) {
     }
 }
 
+function getGroupKeys() {
+    if (groupingMode == 'category') { return clusterLabels; }
+    return materialFilterLabels;
+}
+
+function getGroupDisplayName(key) {
+    if (groupingMode == 'category') { return clusterDisplayNames[key] || key; }
+    return materialDisplayNames[key] || key;
+}
+
+function getObjectGroupKey(obj) {
+    if (groupingMode == 'category') { return obj.cluster; }
+    return obj.material;
+}
+
+function repositionClouds() {
+    var keys = getGroupKeys();
+    var dataAttr = groupingMode == 'category' ? 'data-cluster' : 'data-material';
+    var containerWidth = cloudAreaEl.offsetWidth;
+    var colGap = 24;
+
+    var cols;
+    if (containerWidth >= 1600) { cols = 5; }
+    else if (containerWidth >= 1100) { cols = 4; }
+    else if (containerWidth >= 700) { cols = 3; }
+    else if (containerWidth >= 400) { cols = 2; }
+    else { cols = 1; }
+
+    var colWidth = Math.floor((containerWidth - (cols - 1) * colGap) / cols);
+    var colTops = [];
+    for (var c = 0; c < cols; c++) { colTops.push(0); }
+
+    for (var i = 0; i < keys.length; i++) {
+        var sec = cloudAreaEl.querySelector('section[' + dataAttr + '="' + keys[i] + '"]');
+        if (sec == null) { continue; }
+        var col = i % cols;
+        sec.style.left = (col * (colWidth + colGap)) + 'px';
+        sec.style.top = colTops[col] + 'px';
+        sec.style.width = colWidth + 'px';
+        colTops[col] += sec.offsetHeight + 40;
+    }
+
+    var maxBottom = 0;
+    for (var c = 0; c < cols; c++) {
+        if (colTops[c] > maxBottom) { maxBottom = colTops[c]; }
+    }
+    cloudAreaEl.style.minHeight = maxBottom + 'px';
+}
+
+function renderClouds() {
+    var keys = getGroupKeys();
+    var dataAttr = groupingMode == 'category' ? 'data-cluster' : 'data-material';
+
+    while (cloudAreaEl.firstChild) {
+        cloudAreaEl.removeChild(cloudAreaEl.firstChild);
+    }
+
+    for (var i = 0; i < keys.length; i++) {
+        var sec = document.createElement('section');
+        sec.setAttribute(dataAttr, keys[i]);
+        var heading = document.createElement('h2');
+        heading.textContent = getGroupDisplayName(keys[i]);
+        sec.appendChild(heading);
+        cloudAreaEl.appendChild(sec);
+    }
+
+    for (var i = 0; i < currentObjectList.length; i++) {
+        var obj = currentObjectList[i];
+        var groupKey = getObjectGroupKey(obj);
+        if (groupKey == null) { continue; }
+        var sec = cloudAreaEl.querySelector('section[' + dataAttr + '="' + groupKey + '"]');
+        if (sec == null) { continue; }
+        var card = cardMap[obj.systemNumber];
+        if (card == null) { continue; }
+        var h2 = card.querySelector('h2');
+        if (h2 != null) { h2.textContent = buildHoverText(obj); }
+        sec.appendChild(card);
+    }
+
+    activeGroup = null;
+    repositionClouds();
+}
+
+function scrollToCloud(key) {
+    var dataAttr = groupingMode == 'category' ? 'data-cluster' : 'data-material';
+    var allSections = cloudAreaEl.querySelectorAll('section[' + dataAttr + ']');
+    for (var i = 0; i < allSections.length; i++) {
+        allSections[i].removeAttribute('data-active');
+    }
+    var target = cloudAreaEl.querySelector('section[' + dataAttr + '="' + key + '"]');
+    if (target == null) { return; }
+    if (activeGroup == key) {
+        activeGroup = null;
+        return;
+    }
+    activeGroup = key;
+    target.setAttribute('data-active', 'true');
+    target.scrollIntoView({ block: 'center', inline: 'center' });
+}
+
+function applySearch() {
+    for (var i = 0; i < currentObjectList.length; i++) {
+        var obj = currentObjectList[i];
+        var card = cardMap[obj.systemNumber];
+        if (card == null) { continue; }
+        if (searchText == '') {
+            card.style.display = '';
+        } else {
+            var matches = obj.specificLabel != null && obj.specificLabel.indexOf(searchText) != -1;
+            card.style.display = matches ? '' : 'none';
+        }
+    }
+}
+
 function setupFilters() {
-    let btnCategory = document.getElementById('btn-category');
-    let btnMaterial = document.getElementById('btn-material');
+    var btnCategory = document.getElementById('btn-category');
+    var btnMaterial = document.getElementById('btn-material');
 
     btnCategory.addEventListener('click', function() {
         btnCategory.setAttribute('aria-pressed', 'true');
         btnMaterial.setAttribute('aria-pressed', 'false');
         filterOptions.setAttribute('aria-label', 'Category filters');
+        groupingMode = 'category';
+        renderClouds();
         renderFilterButtons('category');
     });
 
@@ -236,13 +322,17 @@ function setupFilters() {
         btnMaterial.setAttribute('aria-pressed', 'true');
         btnCategory.setAttribute('aria-pressed', 'false');
         filterOptions.setAttribute('aria-label', 'Material filters');
+        groupingMode = 'material';
+        renderClouds();
         renderFilterButtons('material');
     });
 
     filterSearch.addEventListener('input', function() {
         searchText = filterSearch.value.toLowerCase();
-        renderCards(getFilteredList(currentObjectList));
+        applySearch();
     });
+
+    renderFilterButtons('category');
 }
 
 function mapSpecificToCluster(specificLabel) {
@@ -347,7 +437,7 @@ async function movePreClustered(objectList) {
     console.log('Moving ' + objectList.length + ' objects with pre-assigned cluster values into visual clouds...');
     for (let i = 0; i < objectList.length; i++) {
         moveCardToCloud(objectList[i]);
-        updateResultsStatus('Loading — ' + (i + 1) + ' / ' + objectList.length + ' placed...');
+        updateResultsStatus('Loading pre-classified objects — ' + (i + 1) + ' / ' + objectList.length + ' placed into clusters...');
         await delay(80);
     }
 }
@@ -387,6 +477,12 @@ async function fetchPreClusters() {
 async function classifyAll(objectList) {
     for (let i = 0; i < objectList.length; i++) {
         let obj = objectList[i];
+        let progress = (i + 1) + ' / ' + objectList.length;
+        let card = cardMap[obj.systemNumber];
+
+        if (card != null) { card.setAttribute('data-classifying', 'true'); }
+        updateResultsStatus('AI classifying (' + progress + ') — ' + obj.title + (obj.objectType ? ' [' + obj.objectType + ']' : '') + '...');
+
         let imgSrc = imageUrl + "/" + obj.imageId + "/full/!400,400/0/default.jpg";
         try {
             let result = await classifyImage(imgSrc, specificTypeLabels, materialLabels);
@@ -396,11 +492,15 @@ async function classifyAll(objectList) {
         } catch (error) {
             console.error('Classification error for "' + obj.title + '":', error);
         }
+
+        if (card != null) { card.removeAttribute('data-classifying'); }
+
+        let clusterName = clusterDisplayNames[obj.cluster] || obj.cluster || '';
         console.log('Assigning a cluster to: "' + obj.title + '" (' + (i + 1) + ' of ' + objectList.length + ')');
-        let clusterName = clusterDisplayNames[obj.cluster] || obj.cluster;
         console.log('Moving "' + obj.title + '" to cloud: ' + clusterName + ' (identified as: ' + obj.specificLabel + ')');
+
+        updateResultsStatus('Classified (' + progress + '): ' + obj.title + '  →  AI label: ' + (obj.specificLabel || 'unrecognised') + '  →  Cluster: ' + clusterName);
         moveCardToCloud(obj);
-        updateResultsStatus('AI classifying — ' + (i + 1) + ' / ' + objectList.length + ' done...');
         saveCache(currentObjectList);
     }
 }
@@ -435,7 +535,8 @@ function renderPendingSection(unclassified, allObjects) {
         }
     }
     let heading = document.createElement('h2');
-    heading.textContent = 'AI is classifying these...';
+    heading.id = 'pending-heading';
+    heading.textContent = 'Queued for AI classification';
     pendingEl.appendChild(heading);
     for (let i = 0; i < unclassified.length; i++) {
         pendingEl.appendChild(cardMap[unclassified[i].systemNumber]);
@@ -461,36 +562,23 @@ function getOrCreateCloudSection(clusterKey) {
     return sec;
 }
 
+function buildHoverText(obj) {
+    var parts = [obj.title];
+    if (obj.specificLabel) { parts.push(obj.specificLabel); }
+    var clusterName = clusterDisplayNames[obj.cluster] || '';
+    if (clusterName) { parts.push(clusterName); }
+    return parts.join(' | ');
+}
+
 function moveCardToCloud(obj) {
     let cloudSection = getOrCreateCloudSection(obj.cluster);
     let card = cardMap[obj.systemNumber];
-    let p = card.querySelector('p');
-    if (p != null) {
-        p.textContent = obj.specificLabel || obj.cluster || '';
-    }
+    let h2 = card.querySelector('h2');
+    if (h2 != null) { h2.textContent = buildHoverText(obj); }
     cloudSection.appendChild(card);
+    repositionClouds();
 }
 
-// TODO: renderCards is still used by search/filter — will be replaced in the cloud layout task
-function renderCards(objectList) {
-    for (var i = 0; i < objectList.length; i++) {
-        if (cardMap[objectList[i].systemNumber] == null) {
-            cardMap[objectList[i].systemNumber] = createCard(objectList[i]);
-        }
-    }
-    while (main.firstChild) {
-        main.removeChild(main.firstChild);
-    }
-    for (var i = 0; i < objectList.length; i++) {
-        var obj = objectList[i];
-        var card = cardMap[obj.systemNumber];
-        var p = card.querySelector('p');
-        if (p != null) {
-            p.textContent = obj.cluster || '';
-        }
-        main.appendChild(card);
-    }
-}
 
 async function displayObjects() {
     const records = await fetchData();
@@ -503,8 +591,11 @@ async function displayObjects() {
     pendingEl = document.createElement('section');
     pendingEl.setAttribute('data-pending', 'true');
     cloudAreaEl = document.createElement('section');
+    cloudAreaEl.setAttribute('data-cloud-area', 'true');
     main.appendChild(pendingEl);
     main.appendChild(cloudAreaEl);
+
+    renderClouds();
 
     applyObjectTypeMapping(objectList);
 
@@ -526,12 +617,17 @@ async function displayObjects() {
     renderPendingSection(unclassified, objectList);
 
     if (unclassified.length > 0) {
-        updateResultsStatus(unclassified.length + ' objects being classified by AI...');
+        updateResultsStatus('Loading ' + preclustered.length + ' pre-classified objects — ' + unclassified.length + ' objects queued for live AI...');
+    } else {
+        updateResultsStatus('Loading ' + preclustered.length + ' pre-classified objects...');
     }
 
     await movePreClustered(preclustered);
 
     if (unclassified.length > 0) {
+        let pendingHeading = document.getElementById('pending-heading');
+        if (pendingHeading != null) { pendingHeading.textContent = 'AI is classifying these now...'; }
+        updateResultsStatus('Pre-loading complete — starting live AI classification of ' + unclassified.length + ' objects...');
         let startTime = Date.now();
         console.log('Running AI classification... ' + new Date().toLocaleTimeString());
         await classifyAll(unclassified);
@@ -541,15 +637,15 @@ async function displayObjects() {
 
     collapsePending();
     saveCache(objectList);
-    updateResultsStatus(objectList.length + ' objects — clustering complete.');
+    updateResultsStatus('All ' + objectList.length + ' objects clustered — ready to explore.');
 
-    let exportBtn = document.getElementById('btn-export');
-    if (exportBtn != null) {
-        exportBtn.disabled = false;
-        exportBtn.addEventListener('click', function() {
-            exportClusters(currentObjectList);
-        });
-    }
+    // let exportBtn = document.getElementById('btn-export');
+    // if (exportBtn != null) {
+    //     exportBtn.disabled = false;
+    //     exportBtn.addEventListener('click', function() {
+    //         exportClusters(currentObjectList);
+    //     });
+    // }
 }
 
 displayObjects();
