@@ -101,6 +101,13 @@ let cardMap = {};
 let cloudAreaEl = null;
 let pendingEl = null;
 
+var physicsEngine = null;
+var physicsRunner = null;
+var physicsBodies = {};
+var clusterCenters = {};
+var objLookup = {};
+var physicsSettled = false;
+
 async function fetchData() {
     let allObjects = [];
     let page = 1;
@@ -206,72 +213,187 @@ function getObjectGroupKey(obj) {
     return obj.material;
 }
 
-function repositionClouds() {
-    var keys = getGroupKeys();
-    var dataAttr = groupingMode == 'category' ? 'data-cluster' : 'data-material';
-    var containerWidth = cloudAreaEl.offsetWidth;
-    var colGap = 24;
 
-    var cols;
-    if (containerWidth >= 1600) { cols = 5; }
-    else if (containerWidth >= 1100) { cols = 4; }
-    else if (containerWidth >= 700) { cols = 3; }
-    else if (containerWidth >= 400) { cols = 2; }
-    else { cols = 1; }
+function calculateClusterCenters(mode) {
+    clusterCenters = {};
+    var keys = mode == 'category' ? clusterLabels : materialFilterLabels;
+    var width = cloudAreaEl.offsetWidth;
 
-    var colWidth = Math.floor((containerWidth - (cols - 1) * colGap) / cols);
+    var cols = 2;
+    if (width < 500) { cols = 1; }
+
+    // Count how many classified objects belong to each cluster key
+    var countPerKey = {};
+    for (var j = 0; j < currentObjectList.length; j++) {
+        var obj = currentObjectList[j];
+        var groupKey = mode == 'category' ? obj.cluster : obj.material;
+        if (groupKey == null) { continue; }
+        if (countPerKey[groupKey] == null) { countPerKey[groupKey] = 0; }
+        countPerKey[groupKey]++;
+    }
+
+    var padX = 180;
+    var padY = 220;
+    var gapH = 80;
+    var waveAmplitude = 130;
+    var cellW = (width - padX * 2) / cols;
+
+    // Each column tracks its own running y position independently
     var colTops = [];
-    for (var c = 0; c < cols; c++) { colTops.push(0); }
+    for (var c = 0; c < cols; c++) { colTops.push(padY); }
+
+    var maxBottom = padY;
 
     for (var i = 0; i < keys.length; i++) {
-        var sec = cloudAreaEl.querySelector('section[' + dataAttr + '="' + keys[i] + '"]');
-        if (sec == null) { continue; }
         var col = i % cols;
-        sec.style.left = (col * (colWidth + colGap)) + 'px';
-        sec.style.top = colTops[col] + 'px';
-        sec.style.width = colWidth + 'px';
-        colTops[col] += sec.offsetHeight + 40;
+        var count = countPerKey[keys[i]] || 0;
+        // Taller space for larger clusters; sqrt keeps the scale from getting extreme
+        var clusterH = Math.max(300, Math.round(40 * Math.sqrt(count)) + 150);
+        // Odd columns shift down, even columns shift up
+        var waveOffset = (col % 2 == 0 ? -1 : 1) * waveAmplitude;
+        clusterCenters[keys[i]] = {
+            x: padX + col * cellW + cellW / 2,
+            y: colTops[col] + clusterH / 2 + waveOffset
+        };
+        colTops[col] += clusterH + gapH;
+        if (colTops[col] > maxBottom) { maxBottom = colTops[col]; }
     }
 
-    var maxBottom = 0;
-    for (var c = 0; c < cols; c++) {
-        if (colTops[c] > maxBottom) { maxBottom = colTops[c]; }
+    cloudAreaEl.style.minHeight = (maxBottom + padY + waveAmplitude) + 'px';
+}
+
+function repositionLabels() {
+    var dataAttr = groupingMode == 'category' ? 'data-cluster' : 'data-material';
+    var keys = getGroupKeys();
+    for (var i = 0; i < keys.length; i++) {
+        var center = clusterCenters[keys[i]];
+        if (center == null) { continue; }
+        var sec = cloudAreaEl.querySelector('section[' + dataAttr + '="' + keys[i] + '"]');
+        if (sec == null) { continue; }
+        sec.style.left = (center.x - sec.offsetWidth / 2) + 'px';
+        sec.style.top = (center.y - 160) + 'px';
     }
-    cloudAreaEl.style.minHeight = maxBottom + 'px';
+}
+
+function initPhysics() {
+    physicsEngine = Matter.Engine.create();
+    physicsEngine.gravity.x = 0;
+    physicsEngine.gravity.y = 0;
+    physicsRunner = Matter.Runner.create();
+    Matter.Runner.run(physicsRunner, physicsEngine);
+    Matter.Events.on(physicsEngine, 'beforeUpdate', applyCentripetalForce);
+}
+
+function applyCentripetalForce() {
+    if (physicsSettled) { return; }
+    var strength = 0.0001;
+    var deadZone = 100; // cards within this radius of their centre settle freely
+    for (var sysNum in physicsBodies) {
+        var body = physicsBodies[sysNum];
+        var obj = objLookup[sysNum];
+        if (obj == null) { continue; }
+        var groupKey = getObjectGroupKey(obj);
+        var center = clusterCenters[groupKey];
+        if (center == null) { continue; }
+        var dx = center.x - body.position.x;
+        var dy = center.y - body.position.y;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < deadZone) { continue; }
+        Matter.Body.applyForce(body, body.position, { x: dx * strength, y: dy * strength });
+    }
+}
+
+function settlePhysics() {
+    physicsSettled = true;
+    for (var sysNum in physicsBodies) {
+        Matter.Body.setVelocity(physicsBodies[sysNum], { x: 0, y: 0 });
+        Matter.Body.setAngularVelocity(physicsBodies[sysNum], 0);
+    }
+}
+
+function startRenderLoop() {
+    function tick() {
+        for (var sysNum in physicsBodies) {
+            var body = physicsBodies[sysNum];
+            var card = cardMap[sysNum];
+            if (card == null) { continue; }
+            card.style.left = (body.position.x - 18) + 'px';
+            card.style.top = (body.position.y - 18) + 'px';
+        }
+        requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+}
+
+function spawnCardBody(obj) {
+    if (physicsEngine == null) { return; }
+    var groupKey = getObjectGroupKey(obj);
+    var center = clusterCenters[groupKey];
+    if (center == null) { return; }
+    var radius = 20;
+    var spawnX = center.x + (Math.random() - 0.5) * 220;
+    var spawnY = center.y + (Math.random() - 0.5) * 220;
+    var body = Matter.Bodies.circle(spawnX, spawnY, radius, {
+        label: obj.systemNumber,
+        restitution: 0.2,
+        friction: 0.1,
+        frictionAir: 0.1
+    });
+    Matter.World.add(physicsEngine.world, body);
+    physicsBodies[obj.systemNumber] = body;
 }
 
 function renderClouds() {
-    var keys = getGroupKeys();
     var dataAttr = groupingMode == 'category' ? 'data-cluster' : 'data-material';
+    physicsSettled = false; // re-enable centripetal force for the new layout
 
+    // Remove all physics bodies from the world
+    var bodyArr = [];
+    for (var sysNum in physicsBodies) {
+        bodyArr.push(physicsBodies[sysNum]);
+    }
+    if (physicsEngine != null && bodyArr.length > 0) {
+        Matter.World.remove(physicsEngine.world, bodyArr);
+    }
+    physicsBodies = {};
+
+    // Clear the cloud area DOM
     while (cloudAreaEl.firstChild) {
         cloudAreaEl.removeChild(cloudAreaEl.firstChild);
     }
 
+    calculateClusterCenters(groupingMode);
+
+    // Create a floating label section at each cluster center
+    var keys = getGroupKeys();
     for (var i = 0; i < keys.length; i++) {
+        var center = clusterCenters[keys[i]];
         var sec = document.createElement('section');
         sec.setAttribute(dataAttr, keys[i]);
         var heading = document.createElement('h2');
         heading.textContent = getGroupDisplayName(keys[i]);
         sec.appendChild(heading);
         cloudAreaEl.appendChild(sec);
+        // Centre horizontally on the cluster point; sit above where cards will settle
+        sec.style.left = (center.x - sec.offsetWidth / 2) + 'px';
+        sec.style.top = (center.y - 160) + 'px';
+        sec.style.zIndex = '15';
     }
 
+    // Re-add all classified cards directly into cloudAreaEl and spawn their bodies
     for (var i = 0; i < currentObjectList.length; i++) {
         var obj = currentObjectList[i];
         var groupKey = getObjectGroupKey(obj);
         if (groupKey == null) { continue; }
-        var sec = cloudAreaEl.querySelector('section[' + dataAttr + '="' + groupKey + '"]');
-        if (sec == null) { continue; }
         var card = cardMap[obj.systemNumber];
         if (card == null) { continue; }
         var h2 = card.querySelector('h2');
         if (h2 != null) { h2.textContent = buildHoverText(obj); }
-        sec.appendChild(card);
+        cloudAreaEl.appendChild(card);
+        spawnCardBody(obj);
     }
 
     activeGroup = null;
-    repositionClouds();
 }
 
 function scrollToCloud(key) {
@@ -519,14 +641,6 @@ function createCard(obj) {
     return card;
 }
 
-function createGroupSection(key, dataAttrName) {
-    let sec = document.createElement('section');
-    sec.setAttribute(dataAttrName, key);
-    let heading = document.createElement('h2');
-    heading.textContent = clusterDisplayNames[key] || key;
-    sec.appendChild(heading);
-    return sec;
-}
 
 function renderPendingSection(unclassified, allObjects) {
     for (let i = 0; i < allObjects.length; i++) {
@@ -550,17 +664,6 @@ function collapsePending() {
     pendingEl = null;
 }
 
-function getOrCreateCloudSection(clusterKey) {
-    let sections = cloudAreaEl.querySelectorAll('section');
-    for (let i = 0; i < sections.length; i++) {
-        if (sections[i].getAttribute('data-cluster') == clusterKey) {
-            return sections[i];
-        }
-    }
-    let sec = createGroupSection(clusterKey, 'data-cluster');
-    cloudAreaEl.appendChild(sec);
-    return sec;
-}
 
 function buildHoverText(obj) {
     var parts = [obj.title];
@@ -571,12 +674,23 @@ function buildHoverText(obj) {
 }
 
 function moveCardToCloud(obj) {
-    let cloudSection = getOrCreateCloudSection(obj.cluster);
-    let card = cardMap[obj.systemNumber];
-    let h2 = card.querySelector('h2');
+    var card = cardMap[obj.systemNumber];
+    if (card == null) { return; }
+    var h2 = card.querySelector('h2');
     if (h2 != null) { h2.textContent = buildHoverText(obj); }
-    cloudSection.appendChild(card);
-    repositionClouds();
+    if (card.parentNode != cloudAreaEl) {
+        // Switch to absolute positioning so the physics render loop can place it
+        card.style.position = 'absolute';
+        card.style.left = '-9999px';
+        card.style.top = '-9999px';
+        cloudAreaEl.appendChild(card);
+    }
+    // Remove any existing body before spawning a new one (e.g. re-classification)
+    if (physicsBodies[obj.systemNumber] != null) {
+        Matter.World.remove(physicsEngine.world, physicsBodies[obj.systemNumber]);
+        delete physicsBodies[obj.systemNumber];
+    }
+    spawnCardBody(obj);
 }
 
 
@@ -586,6 +700,12 @@ async function displayObjects() {
     shuffleArray(objectList);
 
     currentObjectList = objectList;
+
+    // Build objLookup so the centripetal force handler can find any object by systemNumber
+    for (var i = 0; i < objectList.length; i++) {
+        objLookup[objectList[i].systemNumber] = objectList[i];
+    }
+
     setupFilters();
 
     pendingEl = document.createElement('section');
@@ -595,6 +715,8 @@ async function displayObjects() {
     main.appendChild(pendingEl);
     main.appendChild(cloudAreaEl);
 
+    initPhysics();
+    startRenderLoop();
     renderClouds();
 
     applyObjectTypeMapping(objectList);
@@ -602,6 +724,9 @@ async function displayObjects() {
     let preClusters = await fetchPreClusters();
     if (preClusters != null) {
         applyCache(objectList, preClusters);
+        // Re-calculate centers now that we know actual cluster counts, then move labels to match
+        calculateClusterCenters(groupingMode);
+        repositionLabels();
     }
 
     let preclustered = [];
@@ -638,6 +763,7 @@ async function displayObjects() {
     collapsePending();
     saveCache(objectList);
     updateResultsStatus('All ' + objectList.length + ' objects clustered — ready to explore.');
+    settlePhysics();
 
     // let exportBtn = document.getElementById('btn-export');
     // if (exportBtn != null) {
