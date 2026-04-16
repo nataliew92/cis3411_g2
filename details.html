@@ -4,14 +4,13 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>V&A Collection Explorer</title>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="css/details_styles.css">
 </head>
 <body>
 
 <nav>
   <div class="logo">V<span>&</span>A <span style="color:var(--parchment);font-weight:400">Collection</span></div>
-  <div class="tagline">Object Detection Explorer</div>
 </nav>
 
 <!-- Model loading progress banner -->
@@ -25,7 +24,7 @@
   <input type="number" id="pageSize" value="12" min="1" max="100"/>
   <label style="margin-left:8px">Confidence</label>
   <input type="range" id="threshold" min="0.01" max="0.5" step="0.01" value="0.08"/>
-  <span id="thresholdVal" style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--gold);min-width:30px">0.08</span>
+  <span id="thresholdVal" style="font-family:'Lato';font-size:0.75rem;color:var(--INK);min-width:30px">0.08</span> <!-- PUT IN CSS FILE INSTEAD OF INLINE STYLES IF KEEPING-->
   <button class="btn" id="runBtn" onclick="run()" disabled>Load Collection</button>
   <button class="btn secondary" id="prevBtn" onclick="navigate(-1)" disabled>← Prev</button>
   <button class="btn secondary" id="nextBtn" onclick="navigate(1)" disabled>Next →</button>
@@ -209,9 +208,9 @@
             <div class="panel-body">
               <div class="ai-tags">
                 ${detections === null
-                  ? `<span style="font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--muted)">Analysing…</span>`
+                  ? `<span style="font-family:'Lato';font-size:0.7rem;color:var(--muted)">Analysing…</span>`
                   : detections.length === 0
-                    ? `<span style="font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--muted);font-style:italic">No objects detected above threshold.</span>`
+                    ? `<span style="font-family:'Lato';font-size:0.7rem;color:var(--muted);font-style:italic">No objects detected above threshold.</span>`
                     : detections.map(d=>`
                         <div class="ai-tag">
                           ${d.label}
@@ -228,7 +227,7 @@
             <div class="panel-body">
               <div class="related-grid">
                 ${related.length === 0
-                  ? `<span style="font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--muted);grid-column:1/-1;font-style:italic">${detections===null?"Analysing…":"No related artefacts found yet."}</span>`
+                  ? `<span style="font-family:'Lato';font-size:0.7rem;color:var(--muted);grid-column:1/-1;font-style:italic">${detections===null?"Analysing…":"No related artefacts found yet."}</span>`
                   : related.map(r=>`
                       <div class="related-thumb" onclick="window._showDetail(${objects.indexOf(r)})">
                         <img src="${r.thumbUrl}" alt="${r.title}" loading="lazy"/>
@@ -272,7 +271,7 @@
           ctx.lineWidth = Math.max(2, img.width/280);
           ctx.strokeRect(x1, y1, x2-x1, y2-y1);
           const fs = Math.max(12, img.width/45);
-          ctx.font = `600 ${fs}px JetBrains Mono, monospace`;
+          ctx.font = `600 ${fs}px Lato, sans-serif`;
           const lbl = `${det.label}  ${(det.score*100).toFixed(0)}%`;
           const tw  = ctx.measureText(lbl).width;
           ctx.fillStyle = col; ctx.globalAlpha = 0.88;
@@ -284,7 +283,7 @@
       imgWrap.appendChild(canvas);
     };
     img.onerror = () => {
-      imgWrap.innerHTML = `<div style="color:var(--muted);font-size:0.8rem;padding:40px;font-family:'JetBrains Mono',monospace">Image unavailable</div>`;
+      imgWrap.innerHTML = `<div style="color:var(--muted);font-size:0.8rem;padding:40px;font-family:'Lato'">Image unavailable</div>`;
     };
     img.src = obj.imageUrl;
   }
