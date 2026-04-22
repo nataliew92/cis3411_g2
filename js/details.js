@@ -29,7 +29,7 @@ let objects  = [], results = {}, current = 0;
 
 // ── Threshold slider ──────────────────────────────────────────────────────
 document.getElementById("threshold").addEventListener("input", e => {
-  document.getElementById("thresholdVal").textContent = parseFloat(e.target.value).toFixed(2);
+  document.getElementById("thresholdVal").textContent = Math.round(parseFloat(e.target.value) * 100) + "%";
 });
 
 // ── Status helpers ────────────────────────────────────────────────────────
