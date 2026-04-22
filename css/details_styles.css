@@ -24,18 +24,24 @@
     nav {
       background: var(--ink);
       padding: 0 40px;
-      display: flex; align-items: center; justify-content: space-between;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       height: 56px;
       border-bottom: 3px solid var(--paleblue);
     }
 
     .logo {
       font-family: 'Lora', serif;
-      font-size: 1.3rem; font-weight: 700;
-      color: var(--cream); letter-spacing: 0.04em;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--cream);
+      letter-spacing: 0.04em;
     }
 
-    .logo span { color: var(--paleblue); }
+    .logo span {
+      color: var(--paleblue);
+    }
     
 
     /* MODEL LOADING BANNER */
@@ -50,23 +56,29 @@
     }
 
     #model-banner .progress-wrap {
-      flex: 1; max-width: 300px;
-      height: 4px; background: #3a3028; border-radius: 2px; overflow: hidden;
+      flex: 1;
+      max-width: 300px;
+      height: 4px;
+      background: var(--ink);
+      border-radius: 2px;
+      overflow: hidden;
     }
 
     #model-banner .progress-fill {
-      height: 100%; background: var(--paleblue);
-      border-radius: 2px; width: 0%;
+      height: 100%;
+      background: var(--paleblue);
+      border-radius: 2px;
+      width: 0%;
       transition: width 0.3s ease;
     }
 
     #model-banner.ready {
-      color: #C4D1E6;
+      color: var(--paleblue);
     }
 
     #model-banner.ready .progress-fill {
       width: 100%;
-      background: #C4D1E6;
+      background: var(--paleblue);
     }
 
 
@@ -90,7 +102,7 @@
     }
 
     .browse-bar input[type="number"] {
-      background: var(--warm-white);
+      background: var(--white);
       border: 1px solid var(--muted);
       color: var(--ink);
       font-family: 'Lato', sans-serif;
@@ -131,7 +143,7 @@
     }
 
     .btn:disabled {
-      background: var(--muted);
+      background: var(--section-bg);
       color: var(--muted);
       cursor: not-allowed;
     }
@@ -315,7 +327,7 @@
     }
     
     .panel {
-      background: var(--warm-white); 
+      background: var(--white); 
       border: 1px solid var(--muted);
       border-radius: 2px; 
       overflow: hidden;
@@ -372,7 +384,7 @@
     }
 
     .conf-num { 
-      color:var(--paleblue); 
+      color:var(--ink); 
       font-size:0.6rem; 
     }
 
@@ -422,7 +434,7 @@
     }
 
     .divider { 
-      order:none;
+      border:none;
       border-top:2px solid var(--muted);
       margin: 8px 0 28px;
     }
@@ -450,7 +462,7 @@
     }
 
     .info-content {
-      background: var(--warm-white);
+      background: var(--white);
       border: 1px solid var(--muted);
       border-radius: 2px;
       padding: 13px 15px;
