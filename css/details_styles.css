@@ -11,6 +11,7 @@
 
     html { 
       background: var(--cream);
+      font-size: 1.2rem;
     }
 
     body {
@@ -39,10 +40,37 @@
       letter-spacing: 0.04em;
     }
 
-    .logo span {
+    .logo span { 
+      color: var(--cream); 
+      font-weight: 400;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 24px;
+    }
+
+    .nav-links a {
+      color: var(--cream);
+      text-decoration: none;
+      font-family: 'Lato', sans-serif;
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 4px 0;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    .nav-links a:hover {
       color: var(--paleblue);
     }
-    
+
+    .nav-links a.active {
+      color: var(--paleblue);
+      border-bottom-color: var(--paleblue);
+    }
+
 
     /* MODEL LOADING BANNER */
     #model-banner {
@@ -499,9 +527,62 @@
     @keyframes fadeIn { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:translateY(0)} }
     @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 
+    /* ── Utility / component classes (replacing inline styles) ──────────── */
+    
+    .browse-bar > label:not(:first-of-type) {
+      margin-left: 8px;
+    }
+
+    .threshold-value {
+      font-family: 'Lato', sans-serif;
+      font-size: 0.75rem;
+      color: var(--ink);
+      min-width: 30px;
+    }
+
+    .description em {
+      color: var(--muted);
+    }
+
+    .empty-note {
+      font-family: 'Lato', sans-serif;
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+    .empty-note.italic {
+      font-style: italic;
+    }
+    
+    .related-grid .empty-note {
+      grid-column: 1 / -1;
+    }
+
+    .image-error {
+      font-family: 'Lato', sans-serif;
+      font-size: 0.8rem;
+      color: var(--cream);
+      padding: 40px;
+    }
+
+    .placeholder-msg .big.loading {
+      font-size: 1.4rem;
+    }
+    
+    
     @media (max-width:760px) {
-      nav,.browse-bar,#status,#strip-wrap,#model-banner { padding-left:16px; padding-right:16px; }
-      main { padding:20px 16px 40px; }
-      .detail-grid,.bottom-grid { grid-template-columns:1fr; }
-      .info-row { grid-template-columns:1fr; gap:8px; }
+      nav,.browse-bar,#status,#strip-wrap,#model-banner {
+        padding-left:16px;
+        padding-right:16px;
+      }
+      main {
+        padding:20px 16px 40px;
+      }
+
+      .detail-grid,.bottom-grid {
+        grid-template-columns:1fr;
+      }
+      .info-row {
+        grid-template-columns:1fr;
+        gap:8px;
+      }
     }

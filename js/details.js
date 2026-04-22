@@ -159,7 +159,7 @@ function showDetail(index) {
         <div class="artefact-meta">
           <h2>${obj.title}</h2>
           <div class="system-num">${obj.id}</div>
-          <div class="description">${obj.description || '<em style="color:var(--muted)">No description available.</em>'}</div>
+          <div class="description">${obj.description || '<em>No description available.</em>'}</div>
         </div>
       </div>
 
@@ -169,9 +169,9 @@ function showDetail(index) {
           <div class="panel-body">
             <div class="ai-tags">
               ${detections === null
-                ? `<span style="font-family:'Lato';font-size:0.7rem;color:var(--muted)">Analysing…</span>`
+                ? `<span class="empty-note">Analysing…</span>`
                 : detections.length === 0
-                  ? `<span style="font-family:'Lato';font-size:0.7rem;color:var(--muted);font-style:italic">No objects detected above threshold.</span>`
+                  ? `<span class="empty-note italic">No objects detected above threshold.</span>`
                   : detections.map(d=>`
                       <div class="ai-tag">
                         ${d.label}
@@ -188,7 +188,7 @@ function showDetail(index) {
           <div class="panel-body">
             <div class="related-grid">
               ${related.length === 0
-                ? `<span style="font-family:'Lato';font-size:0.7rem;color:var(--muted);grid-column:1/-1;font-style:italic">${detections===null?"Analysing…":"No related artefacts found yet."}</span>`
+                ? `<span class="empty-note italic">${detections===null?"Analysing…":"No related artefacts found yet."}</span>`
                 : related.map(r=>`
                     <div class="related-thumb" onclick="window._showDetail(${objects.indexOf(r)})">
                       <img src="${r.thumbUrl}" alt="${r.title}" loading="lazy"/>
@@ -244,7 +244,7 @@ function showDetail(index) {
     imgWrap.appendChild(canvas);
   };
   img.onerror = () => {
-    imgWrap.innerHTML = `<div style="color:var(--cream);font-size:0.8rem;padding:40px;font-family:'Lato'">Image unavailable</div>`;
+    imgWrap.innerHTML = `<div class="image-error">Image unavailable</div>`;
   };
   img.src = obj.imageUrl;
 }
@@ -267,7 +267,7 @@ async function run() {
   document.getElementById("prevBtn").disabled = true;
   document.getElementById("nextBtn").disabled = true;
   document.getElementById("strip-wrap").style.display = "none";
-  document.getElementById("main").innerHTML = `<div class="placeholder-msg"><div class="big" style="font-size:1.4rem">Fetching…</div></div>`;
+  document.getElementById("main").innerHTML = `<div class="placeholder-msg"><div class="big loading">Fetching…</div></div>`;
 
   setStatus("Fetching V&A collection…", true);
   try { objects = await fetchObjects(n); }
