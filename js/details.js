@@ -27,9 +27,31 @@ const IMAGE_BASE = "https://framemark.vam.ac.uk/collections";
 let detector = null;
 let objects  = [], results = {}, current = 0;
 
+// ── Threshold slider OLD VERSION ──────────────────────────────────────────────────────
+//document.getElementById("threshold").addEventListener("input", e => {
+//  document.getElementById("thresholdVal").textContent = Math.round(parseFloat(e.target.value) * 100) + "%";
+//});
+
 // ── Threshold slider ──────────────────────────────────────────────────────
-document.getElementById("threshold").addEventListener("input", e => {
-  document.getElementById("thresholdVal").textContent = Math.round(parseFloat(e.target.value) * 100) + "%";
+const thresholdSlider = document.getElementById("threshold");
+const thresholdDisplay = document.getElementById("thresholdVal");
+const presetChips = document.querySelectorAll(".chip");
+
+function updateThresholdDisplay() {
+  thresholdDisplay.textContent = Math.round(parseFloat(thresholdSlider.value) * 100) + "%";
+  const current = parseFloat(thresholdSlider.value).toFixed(2);
+  presetChips.forEach(chip => {
+    chip.classList.toggle("active", parseFloat(chip.dataset.value).toFixed(2) === current);
+  });
+}
+
+thresholdSlider.addEventListener("input", updateThresholdDisplay);
+
+presetChips.forEach(chip => {
+  chip.addEventListener("click", () => {
+    thresholdSlider.value = chip.dataset.value;
+    updateThresholdDisplay();
+  });
 });
 
 // ── Status helpers ────────────────────────────────────────────────────────

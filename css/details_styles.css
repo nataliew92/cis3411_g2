@@ -113,7 +113,6 @@
     /* CONTROLS */
     .browse-bar {
       background: var(--section-bg);
-      border-bottom: 1px solid var(--muted);
       padding: 14px 40px;
       display: flex;
       align-items: center;
@@ -149,6 +148,44 @@
       accent-color: var(--paleblue);
       width: 100px;
       cursor: pointer;
+    }
+
+    .preset-chips {
+      display: flex;
+      gap: 4px;
+      margin-left: 4px;
+    }
+
+    .chip {
+      background: transparent;
+      border: 1px solid var(--muted);
+      color: var(--ink);
+      font-family: 'Lato', sans-serif;
+      font-size: 0.68rem;
+      letter-spacing: 0.05em;
+      padding: 5px 10px;
+      border-radius: 2px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .chip:hover {
+      border-color: var(--paleblue);
+    }
+
+    .chip.active {
+      background: var(--paleblue);
+      border-color: var(--paleblue);
+    }
+
+    .browse-help {
+      background: var(--section-bg);
+      border-bottom: 1px solid var(--muted);
+      padding: 0 40px 12px;
+      font-family: 'Lato', sans-serif;
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-style: italic;
     }
 
     .btn {
