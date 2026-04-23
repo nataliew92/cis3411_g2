@@ -123,6 +123,14 @@ var physicsSettled = false;
 var settleTimer = null;
 var cardHalfSize = 14; // half of rendered card width, updated from DOM and on resize
 
+var aiNoticeDismiss = document.getElementById('ai-notice-dismiss');
+if (aiNoticeDismiss != null) {
+    aiNoticeDismiss.addEventListener('click', function() {
+        var notice = document.getElementById('ai-notice');
+        if (notice != null) { notice.hidden = true; }
+    });
+}
+
 async function fetchData() {
     let allObjects = [];
     let page = 1;
@@ -736,6 +744,8 @@ async function classifyAll(objectList) {
             obj.cluster = mapSpecificToCluster(result.specificLabel);
             var specificMat = result.material;
             obj.material = mapSpecificToMaterial(specificMat);
+            var typeConfidence = result.typeScore || 0;
+            var matConfidence = result.materialScore || 0;
         } catch (error) {
             console.error('Classification error for "' + obj.title + '":', error);
         }
@@ -750,8 +760,8 @@ async function classifyAll(objectList) {
             '[' + (i + 1) + '/' + objectList.length + '] ' + obj.displayName +
             ' | API type: ' + (obj.objectType || 'unknown') +
             ' | API material: ' + (obj.apiMaterial || 'none') +
-            ' | AI object: ' + (obj.specificLabel || 'unrecognised') + ' -> ' + clusterName +
-            ' | AI material: ' + (specificMat || 'unrecognised') + ' -> ' + matClusterName
+            ' | AI object: ' + (obj.specificLabel || 'unrecognised') + ' -> ' + clusterName + ' (' + Math.round(typeConfidence * 100) + '%)' +
+            ' | AI material: ' + (specificMat || 'unrecognised') + ' -> ' + matClusterName + ' (' + Math.round(matConfidence * 100) + '%)'
         );
 
         var logList = document.getElementById('ai-log');
@@ -772,11 +782,11 @@ async function classifyAll(objectList) {
 
             var aiObjSpan = document.createElement('span');
             aiObjSpan.className = 'ai-log-ai';
-            aiObjSpan.textContent = 'AI object label: ' + (obj.specificLabel || 'unrecognised') + ' - ' + clusterName;
+            aiObjSpan.textContent = 'AI object label: ' + (obj.specificLabel || 'unrecognised') + ' - ' + clusterName + ' (' + Math.round(typeConfidence * 100) + '% confidence)';
 
             var aiMatSpan = document.createElement('span');
             aiMatSpan.className = 'ai-log-material';
-            aiMatSpan.textContent = 'AI material label: ' + (specificMat || 'unrecognised') + ' - ' + matClusterName;
+            aiMatSpan.textContent = 'AI material label: ' + (specificMat || 'unrecognised') + ' - ' + matClusterName + ' (' + Math.round(matConfidence * 100) + '% confidence)';
 
             logItem.appendChild(nameSpan);
             logItem.appendChild(apiSpan);
