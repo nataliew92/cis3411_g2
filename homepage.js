@@ -337,7 +337,7 @@ function initPhysics() {
 
 function applyCentripetalForce() {
     if (physicsSettled) { return; }
-    var strength = 0.0001;
+    var strength = 0.0002;
     var deadZone = Math.max(60, cardHalfSize * 4); // scales with card size
     for (var sysNum in physicsBodies) {
         var body = physicsBodies[sysNum];
@@ -357,8 +357,10 @@ function applyCentripetalForce() {
 function settlePhysics() {
     physicsSettled = true;
     for (var sysNum in physicsBodies) {
-        Matter.Body.setVelocity(physicsBodies[sysNum], { x: 0, y: 0 });
-        Matter.Body.setAngularVelocity(physicsBodies[sysNum], 0);
+        var body = physicsBodies[sysNum];
+        Matter.Body.setVelocity(body, { x: 0, y: 0 });
+        Matter.Body.setAngularVelocity(body, 0);
+        Matter.Body.setStatic(body, true);
     }
 }
 
@@ -382,15 +384,15 @@ function spawnCardBody(obj) {
     var groupKey = getObjectGroupKey(obj);
     var center = clusterCenters[groupKey];
     if (center == null) { return; }
-    var radius = cardHalfSize + 5; // body slightly larger than card so there's a visible gap
+    var radius = cardHalfSize + 2; // slight gap between cards without excessive spread
     var spread = Math.max(60, cardHalfSize * 6);
     var spawnX = center.x + (Math.random() - 0.5) * spread;
     var spawnY = Math.max(cardHalfSize + 5, center.y + (Math.random() - 0.5) * spread);
     var body = Matter.Bodies.circle(spawnX, spawnY, radius, {
         label: obj.systemNumber,
-        restitution: 0.2,
+        restitution: 0.05,
         friction: 0.1,
-        frictionAir: 0.15
+        frictionAir: 0.35
     });
     Matter.World.add(physicsEngine.world, body);
     physicsBodies[obj.systemNumber] = body;
