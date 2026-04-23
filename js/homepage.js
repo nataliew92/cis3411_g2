@@ -364,6 +364,43 @@ function applyCentripetalForce() {
 
 function settlePhysics() {
     physicsSettled = true;
+
+    // Group visible bodies by cluster key
+    var clusterBodies = {};
+    for (var sysNum in physicsBodies) {
+        var obj = objLookup[sysNum];
+        if (obj == null) { continue; }
+        var groupKey = getObjectGroupKey(obj);
+        if (groupKey == null) { continue; }
+        var body = physicsBodies[sysNum];
+        // Skip hidden (search-filtered) bodies
+        var card = cardMap[sysNum];
+        if (card != null && card.style.display == 'none') { continue; }
+        if (clusterBodies[groupKey] == null) { clusterBodies[groupKey] = []; }
+        clusterBodies[groupKey].push(sysNum);
+    }
+
+    // Arrange each cluster in a Fibonacci spiral for even distribution
+    var goldenAngle = 2.39996; // radians (~137.5 degrees)
+    var spacing = cardHalfSize * 1;
+    for (var key in clusterBodies) {
+        var center = clusterCenters[key];
+        if (center == null) { continue; }
+        var members = clusterBodies[key];
+        for (var i = 0; i < members.length; i++) {
+            var spiralBody = physicsBodies[members[i]];
+            var angle = i * goldenAngle;
+            var radius = spacing * Math.sqrt(i);
+            var x = center.x + Math.cos(angle) * radius;
+            var y = Math.max(cardHalfSize, center.y + Math.sin(angle) * radius);
+            Matter.Body.setPosition(spiralBody, { x: x, y: y });
+            Matter.Body.setVelocity(spiralBody, { x: 0, y: 0 });
+            Matter.Body.setAngularVelocity(spiralBody, 0);
+            Matter.Body.setStatic(spiralBody, true);
+        }
+    }
+
+    // Freeze any remaining bodies (hidden cards, unclassified, etc.)
     for (var sysNum in physicsBodies) {
         var body = physicsBodies[sysNum];
         Matter.Body.setVelocity(body, { x: 0, y: 0 });

@@ -321,7 +321,6 @@ fieldset {
 }
 
 /* --- Articles / Cloud Items --- */
-/* --- AI Notice Banner --- */
 #ai-notice {
   position: fixed;
   bottom: var(--spacing-gap-regular);
@@ -397,7 +396,7 @@ article picture img {
 article h3 {
   order: 2;
   font-family: var(--font-family-serif);
-  font-size: 0.14rem;
+  font-size: 0.1rem;
   display: none;
   background-color: var(--color-brown);
   color: var(--color-white);
@@ -410,7 +409,7 @@ article h3 {
 }
 
 article:hover {
-  transform: scale(8);
+  transform: scale(10);
   transform-origin: bottom left;
   z-index: 20;
   overflow: visible;
