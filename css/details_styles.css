@@ -7,7 +7,25 @@
       --white:      #FFFFFF; 
       --paleblue:   #C4D1E6; 
       --section-bg: #f5e8d2; 
+      /* Spacing */
+      --spacing-gap-micro: 2px;
+      --spacing-gap-tight: 0.25rem; 
+      --spacing-gap-medium: 0.5rem; 
+      --spacing-gap-regular: 1rem; 
+      --spacing-gap-wide: 2rem; 
+
+      /* Typography */
+      --font-family-serif: 'Lora', serif; /* Use for titles and headings */
+      --font-family-sans: 'Lato', sans-serif; /* Use for body text and UI */
+
+      /* Text Sizes (Fluid) */
+      --text-size-main-body: clamp(0.9rem, 0.85rem + 0.25vw, 1.1rem); /* Use for paragraph/body text */
+      --text-size-large-title: clamp(1.5rem, 1.2rem + 1.5vw, 2.5rem); /* Use for page-level titles */
+      --text-size-section-heading: clamp(1rem, 0.9rem + 0.5vw, 1.4rem); /* Use for cluster headings */
+  
     }
+
+    
 
     html { 
       background: var(--cream);
@@ -21,6 +39,32 @@
       min-height: 100vh;
     }
 
+    /* HEADER */
+    header {
+    background-color: var(--ink);
+    color: var(--white);
+    padding: var(--spacing-gap-medium) var(--spacing-gap-regular);
+    position: relative;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-gap-wide);
+    flex-wrap: wrap;
+    border-bottom: 2px solid var(--paleblue);
+    }
+
+    /* FOOTER */
+    footer {
+    background-color: var(--ink);
+    color: var(--white);
+    padding: var(--spacing-gap-medium) var(--spacing-gap-regular);
+    position: relative;
+    z-index: 30;
+    text-align: left;
+    font-size: var(--text-size-sidebar-ui);
+    margin-top: var(--spacing-gap-regular);
+    }
+
     /* NAV */
     nav {
       background: var(--ink);
@@ -29,7 +73,6 @@
       align-items: center;
       justify-content: space-between;
       height: 56px;
-      border-bottom: 3px solid var(--paleblue);
     }
 
     .logo {
@@ -43,6 +86,28 @@
     .logo span { 
       color: var(--cream); 
       font-weight: 400;
+    }
+
+    #logo-mark {
+    font-family: var(--font-family-serif);
+    font-size: var(--text-size-large-title);
+    font-weight: bold;
+    color: var(--section-bg);
+    }
+
+    #site-brand {
+      display: flex;
+      align-items: baseline;
+      gap: var(--spacing-gap-medium);
+      flex-shrink: 0;
+    }
+
+    #site-title {
+    font-family: var(--font-family-serif);
+    font-size: var(--text-size-section-heading);
+    font-weight: normal;
+    color: var(--white);
+    margin: 0;
     }
 
     .nav-links {
