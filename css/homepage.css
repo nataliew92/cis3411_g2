@@ -245,9 +245,15 @@ fieldset {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--spacing-gap-tight);
+  background: none;
+  color: inherit;
+  padding: 0 0 0.3rem 0;
+  position: static;
+  z-index: auto;
   border-bottom: var(--border-style-subtle);
   margin-bottom: var(--spacing-gap-medium);
-  padding-bottom: 0.3rem;
 }
 
 #ai-panel-title {
@@ -315,6 +321,49 @@ fieldset {
 }
 
 /* --- Articles / Cloud Items --- */
+/* --- AI Notice Banner --- */
+#ai-notice {
+  position: fixed;
+  bottom: var(--spacing-gap-regular);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-dark-brown);
+  color: var(--color-white);
+  padding: var(--spacing-gap-medium) var(--spacing-gap-regular);
+  border-radius: var(--radius-standard);
+  z-index: 200;
+  max-width: 44rem;
+  width: calc(100% - 2rem);
+  box-shadow: var(--shadow-hover-pop);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-gap-regular);
+  font-size: var(--text-size-sidebar-ui);
+}
+
+#ai-notice p {
+  margin: 0;
+  flex: 1;
+}
+
+#ai-notice-dismiss {
+  flex-shrink: 0;
+  background: var(--color-brown);
+  color: var(--color-white);
+  border: none;
+  border-radius: var(--radius-standard);
+  padding: var(--spacing-gap-tight) var(--spacing-gap-medium);
+  cursor: pointer;
+  font-size: var(--text-size-sidebar-ui);
+}
+
+#ai-notice-dismiss:hover {
+  background: var(--color-beige);
+  color: var(--color-dark-brown);
+}
+
+#ai-notice[hidden] { display: none; }
+
 section[data-cloud-area] {
   position: relative;
   width: 100%;

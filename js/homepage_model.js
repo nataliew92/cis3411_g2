@@ -48,7 +48,7 @@ async function classifyImage(imageUrl, typeLabels, materialLabels) {
         }
     }
 
-    return { specificLabel: topTypeLabel, material: topMaterialLabel };
+    return { specificLabel: topTypeLabel, material: topMaterialLabel, typeScore: topTypeScore, materialScore: topMaterialScore };
 }
 
 async function detectObjects(imageUrl, labels) {
