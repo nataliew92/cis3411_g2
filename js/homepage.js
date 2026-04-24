@@ -861,7 +861,7 @@ function createCard(obj) {
             '<img src="' + imgSrc + '" alt="" width="400" height="400" loading="lazy">' +
         '</picture>';
     card.addEventListener('click', function() {
-        window.location.href = 'details.html?id=' + obj.systemNumber;
+        window.location.href = 'details.html?id=' + obj.systemNumber + '&img=' + encodeURIComponent(obj.imageId) + '&title=' + encodeURIComponent(obj.displayName);
     });
     return card;
 }

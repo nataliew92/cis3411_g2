@@ -27,10 +27,11 @@ const IMAGE_BASE = "https://framemark.vam.ac.uk/collections";
 let detector = null;
 let objects  = [], results = {}, current = 0;
 
-// ── Threshold slider OLD VERSION ──────────────────────────────────────────────────────
-//document.getElementById("threshold").addEventListener("input", e => {
-//  document.getElementById("thresholdVal").textContent = Math.round(parseFloat(e.target.value) * 100) + "%";
-//});
+// ── URL params (for linked mode from homepage) ───────────────────────────
+var linkedMode = false;
+var urlParams = new URLSearchParams(window.location.search);
+var linkedId = urlParams.get('id');
+var linkedImageId = urlParams.get('img') || null;
 
 // ── Threshold slider ──────────────────────────────────────────────────────
 const thresholdSlider = document.getElementById("threshold");
@@ -90,7 +91,13 @@ async function loadModel() {
     statusEl.textContent = '✓ OWL-ViT ready — running in your browser';
     bar.style.width = '100%';
     document.getElementById("runBtn").disabled = false;
-    setStatus("Model loaded — click Load Collection to begin.");
+
+    if (linkedMode) {
+      setStatus("Model loaded — running AI detection…", true);
+      runLinkedDetection();
+    } else {
+      setStatus("Model loaded — click Load Collection to begin.");
+    }
   } catch(e) {
     statusEl.textContent = `Model failed to load: ${e.message}`;
     banner.style.color = '#e07070';
@@ -98,7 +105,132 @@ async function loadModel() {
   }
 }
 
-// ── Fetch V&A objects ─────────────────────────────────────────────────────
+// ── Fetch single object by systemNumber ───────────────────────────────────
+// Tries the search endpoint first (same format as homepage), then the
+// museumobject endpoint, then falls back to the imageId hint from the URL.
+async function fetchSingleObject(systemNumber, hintImageId) {
+  // Search endpoint — q= returns results in the same format homepage uses
+  try {
+    var p = new URLSearchParams({
+      q: systemNumber, images_exist: "1",
+      page_size: "15"
+    });
+    var resp = await fetch(API_BASE + '?' + p);
+    if (resp.ok) {
+      var data = await resp.json();
+      if (data.records && data.records.length > 0) {
+        var r = null;
+        for (var i = 0; i < data.records.length; i++) {
+          if (data.records[i].systemNumber === systemNumber) { r = data.records[i]; break; }
+        }
+        if (r == null) r = data.records[0];
+        if (r._primaryImageId) {
+          return {
+            id:          r.systemNumber,
+            title:       r._primaryTitle || "Untitled",
+            description: r._primaryDescription || "",
+            materials:   (r.materialsAndTechniques||[]).map(function(m) { return typeof m === 'string' ? m : m.text; }).join(", ") || "",
+            physDesc:    r.physicalDescription || "",
+            imageUrl:    IMAGE_BASE + '/' + r._primaryImageId + '/full/800,/0/default.jpg',
+            thumbUrl:    IMAGE_BASE + '/' + r._primaryImageId + '/full/100,/0/default.jpg',
+          };
+        }
+      }
+    }
+  } catch (e) {
+    console.log('Search failed for ' + systemNumber, e);
+  }
+
+  // Museumobject endpoint — different response shape, extract image from _images
+  try {
+    var resp2 = await fetch('https://api.vam.ac.uk/v2/museumobject/' + systemNumber);
+    if (resp2.ok) {
+      var data2 = await resp2.json();
+      var rec = data2.record;
+      if (rec) {
+        var imgId = null;
+        if (rec._images && rec._images._primary_thumbnail) {
+          var m1 = rec._images._primary_thumbnail.match(/collections\/([^/]+)\//);
+          if (m1) imgId = m1[1];
+        }
+        if (!imgId && rec._images && rec._images._iiif_image_base_url) {
+          var m2 = rec._images._iiif_image_base_url.match(/collections\/([^/]+)/);
+          if (m2) imgId = m2[1];
+        }
+        if (!imgId && hintImageId) imgId = hintImageId;
+
+        if (imgId) {
+          var title = "Untitled";
+          if (rec.titles && rec.titles.length > 0 && rec.titles[0].title) {
+            title = rec.titles[0].title;
+          } else if (rec._primaryTitle) {
+            title = rec._primaryTitle;
+          }
+          return {
+            id:          rec.systemNumber,
+            title:       title,
+            description: rec.briefDescription || rec._primaryDescription || "",
+            materials:   (rec.materialsAndTechniques||[]).map(function(m) { return typeof m === 'string' ? m : m.text; }).join(", ") || "",
+            physDesc:    rec.physicalDescription || "",
+            imageUrl:    IMAGE_BASE + '/' + imgId + '/full/800,/0/default.jpg',
+            thumbUrl:    IMAGE_BASE + '/' + imgId + '/full/100,/0/default.jpg',
+          };
+        }
+      }
+    }
+  } catch (e2) {
+    console.log('Museumobject fetch failed for ' + systemNumber, e2);
+  }
+
+  // Fallback: build from the homepage URL hint if available
+  if (hintImageId) {
+    return {
+      id:          systemNumber,
+      title:       urlParams.get('title') || "Untitled",
+      description: "",
+      materials:   "",
+      physDesc:    "",
+      imageUrl:    IMAGE_BASE + '/' + hintImageId + '/full/800,/0/default.jpg',
+      thumbUrl:    IMAGE_BASE + '/' + hintImageId + '/full/100,/0/default.jpg',
+    };
+  }
+
+  return null;
+}
+
+// ── Fetch cluster siblings from clusters.json ─────────────────────────────
+async function fetchClusterSiblings(mainId) {
+  try {
+    var resp = await fetch('clusters.json');
+    if (!resp.ok) return [];
+    var clusters = await resp.json();
+
+    var mainEntry = clusters[mainId];
+    if (!mainEntry || !mainEntry.cluster) return [];
+
+    var targetCluster = mainEntry.cluster;
+    var siblingIds = [];
+    for (var sysNum in clusters) {
+      if (sysNum !== mainId && clusters[sysNum].cluster === targetCluster) {
+        siblingIds.push(sysNum);
+      }
+    }
+
+    // Shuffle and cap at 12
+    for (var i = siblingIds.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = siblingIds[i];
+      siblingIds[i] = siblingIds[j];
+      siblingIds[j] = tmp;
+    }
+    return siblingIds.slice(0, 12);
+  } catch (e) {
+    console.log('Failed to load clusters.json:', e);
+    return [];
+  }
+}
+
+// ── Fetch V&A objects (batch — browse mode) ───────────────────────────────
 async function fetchObjects(n) {
   const p = new URLSearchParams({
     id_category:"THES48967", id_collection:"THES48593",
@@ -212,7 +344,7 @@ function showDetail(index) {
               ${related.length === 0
                 ? `<span class="empty-note italic">${detections===null?"Analysing…":"No related artefacts found yet."}</span>`
                 : related.map(r=>`
-                    <div class="related-thumb" onclick="window._showDetail(${objects.indexOf(r)})">
+                    <div class="related-thumb" onclick="window._goToDetail('${r.id}')">
                       <img src="${r.thumbUrl}" alt="${r.title}" loading="lazy"/>
                       <div class="rel-label">${r.title}</div>
                     </div>`).join("")
@@ -271,7 +403,19 @@ function showDetail(index) {
   img.src = obj.imageUrl;
 }
 
-// Expose to onclick handlers in injected HTML
+// ── Navigation helpers ────────────────────────────────────────────────────
+window._goToDetail = function(objectId) {
+  var idx = -1;
+  for (var i = 0; i < objects.length; i++) {
+    if (objects[i].id === objectId) { idx = i; break; }
+  }
+  if (idx !== -1) {
+    showDetail(idx);
+  } else {
+    window.location.href = 'details.html?id=' + objectId;
+  }
+};
+
 window._showDetail = showDetail;
 
 function navigate(dir) {
@@ -280,7 +424,94 @@ function navigate(dir) {
 }
 window.navigate = navigate;
 
-// ── Main run ──────────────────────────────────────────────────────────────
+// ── Linked mode (arrived from homepage with ?id=) ─────────────────────────
+async function initLinkedMode() {
+  linkedMode = true;
+
+  var browseBar = document.querySelector('.browse-bar');
+  if (browseBar) browseBar.style.display = 'none';
+  var browseHelp = document.querySelector('.browse-help');
+  if (browseHelp) browseHelp.style.display = 'none';
+
+  // Show a loading state straight away
+  document.getElementById("main").innerHTML =
+    '<div class="placeholder-msg"><div class="big loading">🏛</div>' +
+    '<p>Loading artefact…</p></div>';
+  setStatus("Loading artefact…", true);
+
+  try {
+    var mainObj = await fetchSingleObject(linkedId, linkedImageId);
+  } catch (err) {
+    console.log('initLinkedMode fetch error:', err);
+    setStatus("Error loading artefact: " + err.message);
+    document.getElementById("main").innerHTML =
+      '<div class="placeholder-msg">' +
+        '<div class="big">❌</div>' +
+        '<p>Something went wrong loading this artefact.<br>' +
+        '<a href="index.html">← Back to homepage</a></p>' +
+      '</div>';
+    return;
+  }
+
+  if (!mainObj) {
+    setStatus("Could not find object " + linkedId + ".");
+    document.getElementById("main").innerHTML =
+      '<div class="placeholder-msg">' +
+        '<div class="big">❌</div>' +
+        '<p>Object <strong>' + linkedId + '</strong> could not be found in the V&A collection.<br>' +
+        '<a href="index.html">← Back to homepage</a></p>' +
+      '</div>';
+    return;
+  }
+
+  objects = [mainObj];
+  current = 0;
+  showDetail(0);
+  setStatus("Artefact loaded — fetching similar objects…", true);
+
+  var siblingIds = await fetchClusterSiblings(linkedId);
+
+  if (siblingIds.length > 0) {
+    setStatus("Loading " + siblingIds.length + " related objects…", true);
+    var loaded = 0;
+    for (var i = 0; i < siblingIds.length; i++) {
+      try {
+        var sibObj = await fetchSingleObject(siblingIds[i]);
+        if (sibObj) { objects.push(sibObj); loaded++; }
+      } catch (e) {
+        console.log('Failed to load sibling ' + siblingIds[i]);
+      }
+    }
+    buildStrip();
+    setStatus("Loaded " + loaded + " related objects — waiting for AI model…", true);
+  } else {
+    setStatus("Waiting for AI model…", true);
+  }
+
+  document.getElementById("prevBtn").disabled = true;
+  document.getElementById("nextBtn").disabled = objects.length <= 1;
+}
+
+// ── Run AI detection on linked objects ─────────────────────────────────────
+async function runLinkedDetection() {
+  if (!detector || objects.length === 0) return;
+
+  setStatus("Running AI detection on " + objects.length + " artefacts…", true);
+  var done = 0;
+  for (var i = 0; i < objects.length; i++) {
+    try {
+      results[objects[i].id] = await analyseObject(objects[i]);
+    } catch (e) {
+      results[objects[i].id] = [];
+    }
+    done++;
+    setStatus("Analysed " + done + " / " + objects.length + "…", done < objects.length);
+    showDetail(current);
+  }
+  setStatus("Done — " + objects.length + " artefacts analysed.");
+}
+
+// ── Browse mode (original Load Collection flow) ──────────────────────────
 async function run() {
   if (!detector) { setStatus("Model not loaded yet."); return; }
   const btn = document.getElementById("runBtn");
@@ -318,5 +549,15 @@ async function run() {
 }
 window.run = run;
 
-// Start loading model immediately
+// ── Init ──────────────────────────────────────────────────────────────────
+if (linkedId) {
+  initLinkedMode();
+} else {
+  document.getElementById("main").innerHTML = `
+    <div class="placeholder-msg">
+      <div class="big">🏛</div>
+      <p>The OWL-ViT model is loading into your browser.<br>Once ready, click <strong>Load Collection</strong> to begin.</p>
+    </div>`;
+}
+
 loadModel();

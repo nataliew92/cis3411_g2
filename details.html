@@ -6,16 +6,16 @@
   <title>V&A Collection Explorer</title>
   <link href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="css/details_styles.css">
+  <style>
+    .back-link { display: none; margin: 0.5rem 1.5rem; font-family: 'Lato', sans-serif; font-size: 0.95rem; }
+    .back-link a { text-decoration: none; opacity: 0.75; transition: opacity 0.2s; }
+    .back-link a:hover { opacity: 1; }
+    body.linked-mode .back-link { display: block; }
+    body.linked-mode .browse-bar { display: none; }
+    body.linked-mode .browse-help { display: none; }
+  </style>
 </head>
 <body>
-
-<!--<nav>
-  <div class="logo">Museum <span>Collection</span></div>
-  <div class="nav-links">
-    <a href="index.html">Home</a>
-    <a href="details.html" class="active">Details</a>
-  </div>
-</nav>-->
 
 <header>
   <span id="logo-mark">M|E</span>
@@ -28,7 +28,8 @@
   </nav>
 </header>
 
-    
+<div class="back-link"><a href="index.html">← Back to collection</a></div>
+
 <!-- Model loading progress banner -->
 <div id="model-banner">
   <span id="model-status">Loading OWL-ViT model…</span>
@@ -63,6 +64,12 @@
   </div>
 </main>
 
+<script>
+  // Apply linked-mode class early so browse bar is hidden before module loads
+  if (new URLSearchParams(window.location.search).get('id')) {
+    document.body.classList.add('linked-mode');
+  }
+</script>
 <script type="module" src="js/details.js"></script>
 </body>
 </html>
