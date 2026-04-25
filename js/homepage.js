@@ -204,6 +204,7 @@ function renderFilterButtons(container, mode) {
                 renderClouds();
                 if (settleTimer != null) { clearTimeout(settleTimer); }
                 settleTimer = setTimeout(settlePhysics, 4000);
+                scheduleMirrorListBuild();
                 if (btnMode == 'category') {
                     if (btnCategory) btnCategory.setAttribute('aria-pressed', 'true');
                     if (btnMaterial) btnMaterial.setAttribute('aria-pressed', 'false');
@@ -446,12 +447,12 @@ function setupFilters(catOpt, matOpt, searchT, searchM) {
     if (btnCategory) {
         btnCategory.disabled = true;
         btnCategory.title = LOADING_TOOLTIP;
-        btnCategory.addEventListener('click', () => { groupingMode = 'category'; btnCategory.setAttribute('aria-pressed', 'true'); if (btnMaterial) btnMaterial.setAttribute('aria-pressed', 'false'); renderClouds(); if (settleTimer) clearTimeout(settleTimer); settleTimer = setTimeout(settlePhysics, 4000); });
+        btnCategory.addEventListener('click', () => { groupingMode = 'category'; btnCategory.setAttribute('aria-pressed', 'true'); if (btnMaterial) btnMaterial.setAttribute('aria-pressed', 'false'); renderClouds(); if (settleTimer) clearTimeout(settleTimer); settleTimer = setTimeout(settlePhysics, 4000); scheduleMirrorListBuild(); });
     }
     if (btnMaterial) {
         btnMaterial.disabled = true;
         btnMaterial.title = LOADING_TOOLTIP;
-        btnMaterial.addEventListener('click', () => { groupingMode = 'material'; btnMaterial.setAttribute('aria-pressed', 'true'); if (btnCategory) btnCategory.setAttribute('aria-pressed', 'false'); renderClouds(); if (settleTimer) clearTimeout(settleTimer); settleTimer = setTimeout(settlePhysics, 4000); });
+        btnMaterial.addEventListener('click', () => { groupingMode = 'material'; btnMaterial.setAttribute('aria-pressed', 'true'); if (btnCategory) btnCategory.setAttribute('aria-pressed', 'false'); renderClouds(); if (settleTimer) clearTimeout(settleTimer); settleTimer = setTimeout(settlePhysics, 4000); scheduleMirrorListBuild(); });
     }
 
     if (searchT) searchT.addEventListener('input', () => { searchTypeText = searchT.value.toLowerCase(); applySearch(); });
@@ -813,6 +814,45 @@ function setupScrollInteraction() {
     initCloudBasePosition();
 }
 
+function buildMirrorList() {
+    var list = document.getElementById('mirror-list');
+    if (!list) return;
+    list.innerHTML = '';
+    var keys = getGroupKeys();
+    for (var i = 0; i < keys.length; i++) {
+        var key = keys[i];
+        var groupItems = [];
+        for (var j = 0; j < currentObjectList.length; j++) {
+            if (getObjectGroupKey(currentObjectList[j]) == key) groupItems.push(currentObjectList[j]);
+        }
+        if (groupItems.length == 0) continue;
+        var clusterLi = document.createElement('li');
+        var heading = document.createElement('h3');
+        heading.textContent = getGroupDisplayName(key) + ' (' + groupItems.length + ')';
+        clusterLi.appendChild(heading);
+        var ul = document.createElement('ul');
+        for (var k = 0; k < groupItems.length; k++) {
+            var obj = groupItems[k];
+            var itemLi = document.createElement('li');
+            var a = document.createElement('a');
+            a.href = 'details.html?id=' + obj.systemNumber + '&img=' + encodeURIComponent(obj.imageId) + '&title=' + encodeURIComponent(obj.displayName);
+            a.textContent = obj.displayName + (obj.specificLabel ? ' (' + obj.specificLabel + ')' : '');
+            itemLi.appendChild(a);
+            ul.appendChild(itemLi);
+        }
+        clusterLi.appendChild(ul);
+        list.appendChild(clusterLi);
+    }
+}
+
+function scheduleMirrorListBuild() {
+    if (window.requestIdleCallback) {
+        requestIdleCallback(buildMirrorList, { timeout: 4000 });
+    } else {
+        setTimeout(buildMirrorList, 300);
+    }
+}
+
 async function displayObjects() {
     const mainEl = document.getElementById('homepage');
     
@@ -860,7 +900,8 @@ async function displayObjects() {
     saveCache(objectList);
     updateResultsStatus('All ' + objectList.length + ' objects clustered. Ready to explore.');
     settlePhysics();
-    
+    scheduleMirrorListBuild();
+
     if (modelProgWrap) modelProgWrap.classList.add('completely-hidden');
     if (loadPopup && loadPopup.open) loadPopup.close();
 
