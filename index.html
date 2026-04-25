@@ -14,35 +14,71 @@
             <span id="logo-mark">M|E</span>
             <h1 id="site-title">Museum Explorer</h1>
         </div>
-        <nav id="filters" aria-label="Filter collection">
-            <fieldset class="filter-row">
-                <button id="btn-category" aria-pressed="true">Category</button>
-                <ul id="filter-category-options" role="group" aria-label="Category filters"></ul>
-                <search>
-                    <label for="filter-search-type">Search</label>
-                    <input type="search" id="filter-search-type" placeholder="e.g. teddy bear, doll...">
-                </search>
-            </fieldset>
-            <fieldset class="filter-row">
-                <button id="btn-material" aria-pressed="false">Material</button>
-                <ul id="filter-material-options" role="group" aria-label="Material filters"></ul>
-                <search>
-                    <label for="filter-search-mat">Search</label>
-                    <input type="search" id="filter-search-mat" placeholder="e.g. wood, fabric...">
-                </search>
-            </fieldset>
-            <!-- <button id="btn-export" disabled>Export clusters</button> -->
+        <nav aria-label="Main navigation">
+            <div class="nav-links">
+                <a href="index.html" class="active">Home</a>
+                <a href="details.html">Details</a>
+            </div>
         </nav>
     </header>
-    <p id="results-status" role="status"></p>
+
+    <div id="model-progress-wrap" class="sr-only">
+        <progress id="model-progress" value="0" max="100"></progress>
+    </div>
+
+    <nav id="controls-bar" aria-label="Filter collection">
+        <fieldset class="filter-row">
+            <button id="btn-category" aria-pressed="true">Category</button>
+            <ul id="filter-category-options" role="group" aria-label="Category filters"></ul>
+            <search>
+                <label for="filter-search-type">Search</label>
+                <input type="search" id="filter-search-type" placeholder="e.g. teddy bear, doll...">
+            </search>
+        </fieldset>
+        <fieldset class="filter-row">
+            <button id="btn-material" aria-pressed="false">Material</button>
+            <ul id="filter-material-options" role="group" aria-label="Material filters"></ul>
+            <search>
+                <label for="filter-search-mat">Search</label>
+                <input type="search" id="filter-search-mat" placeholder="e.g. wood, fabric...">
+            </search>
+        </fieldset>
+    </nav>
+
+    <output id="results-status">Initializing collection...</output>
+
     <main>
         <section id="homepage" aria-label="Collection results"></section>
-        <!-- aside#ai-panel injected here by JS when classification starts -->
+        
+        <button id="nav-arrow-left" class="nav-arrow" aria-label="Pan left" hidden>
+            <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+        </button>
+        <button id="nav-arrow-right" class="nav-arrow" aria-label="Pan right" hidden>
+            <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+        </button>
     </main>
+
+    <dialog id="loading-popup">
+        <button id="loading-popup-close" class="close-icon" aria-label="Close">×</button>
+        <h2>Clustering Collection...</h2>
+        <p>The AI is currently sorting the collection into visual groups. Filter buttons will be enabled once clustering is complete.</p>
+    </dialog>
+
+    <dialog id="ready-popup">
+        <button id="ready-popup-close" class="close-icon" aria-label="Close">×</button>
+        <h2>Ready!</h2>
+        <p>The collection is clustered and filters are now active. <strong>Scroll down</strong> to focus on clusters, <strong>scroll up</strong> to zoom, or <strong>drag</strong> to pan.</p>
+    </dialog>
+
     <aside id="ai-notice" role="dialog" aria-labelledby="ai-notice-title" aria-modal="false">
         <p><strong id="ai-notice-title">AI classification notice</strong> - This page uses a machine learning model (OWL-ViT) running entirely in your browser to sort objects into categories. No images or personal data are sent to external servers.</p>
         <button id="ai-notice-dismiss">Got it</button>
     </aside>
+    <aside id="scroll-hint" role="dialog" aria-labelledby="scroll-hint-title" aria-modal="false" hidden>
+        <p><strong id="scroll-hint-title">Explore the collection</strong> - Press the down arrow (or scroll down) to focus on clusters one by one. Up arrow to go back. Left/right arrows or a horizontal trackpad swipe to pan. Press Escape to return to the overview. Scroll up to zoom in.</p>
+        <button id="scroll-hint-dismiss">Got it</button>
+    </aside>
+    <p id="cluster-announce" aria-live="polite" aria-atomic="true" class="sr-only"></p>
     <footer>
         <p>M|E Museum Explorer | Young V&amp;A Dolls &amp; Toys collection | CIS3411 Group 2</p>
         <p>Collection data sourced from the Victoria and Albert Museum API</p>

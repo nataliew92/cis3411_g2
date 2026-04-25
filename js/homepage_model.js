@@ -2,15 +2,17 @@ import { pipeline } from "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17
 
 let detector = null;
 
-async function loadDetector() {
+async function loadDetector(progressCallback) {
     if (detector == null) {
-        detector = await pipeline("zero-shot-object-detection", "Xenova/owlvit-base-patch32", { dtype: "q8" });
+        detector = await pipeline("zero-shot-object-detection", "Xenova/owlvit-base-patch32", {
+            progress_callback: progressCallback
+        });
     }
     return detector;
 }
 
-async function classifyImage(imageUrl, typeLabels, materialLabels) {
-    const pipe = await loadDetector();
+async function classifyImage(imageUrl, typeLabels, materialLabels, progressCallback) {
+    const pipe = await loadDetector(progressCallback);
     const allLabels = typeLabels.concat(materialLabels);
 
     // Very low threshold so every label gets a score back
