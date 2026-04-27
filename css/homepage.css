@@ -38,6 +38,8 @@
   /* Layout & Sizing */
   --sidebar-width-fluid: clamp(180px, 15vw, 250px);
   --grid-card-base-size: clamp(10px, 1.5vw, 20px);
+  --article-hover-scale: 7;
+  --h3-sep-scaleY: 0.143;
   
   /* Borders & Effects */
   --border-style-subtle: 1px solid rgba(99, 77, 42, 0.15);
@@ -412,10 +414,11 @@ main {
   z-index: 200;
   overflow: hidden;
   justify-content: flex-start;
+  background: var(--color-cream);
 }
 
 #ai-pending-cards article:hover picture img {
-  height: 120px;
+  height: 180px;
   object-fit: contain;
   width: 100%;
 }
@@ -578,11 +581,16 @@ article h3 {
   line-height: 1.3;
 }
 
+article {
+  transition: transform 0s 0s;
+}
+
 article:hover {
-  transform: scale(7);
+  transform: scale(var(--article-hover-scale));
   z-index: 20;
   overflow: visible;
   filter: drop-shadow(1px 2px 3px rgba(0, 0, 0, 0.14));
+  transition: transform 0s 0.2s;
 }
 
 article:hover h3 { display: block; }
@@ -596,15 +604,7 @@ article h3 .h3-sep {
 }
 
 article:hover h3 .h3-sep {
-  transform: scaleY(0.1);
-}
-
-body.focus-mode article:hover h3 .h3-sep {
-  transform: scaleY(0.33);
-}
-
-body.focus-mode article:hover {
-  transform: scale(5);
+  transform: scaleY(var(--h3-sep-scaleY, 0.143));
 }
 
 /* --- Floating Sections --- */

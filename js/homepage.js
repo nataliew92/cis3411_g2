@@ -205,6 +205,7 @@ function renderFilterButtons(container, mode) {
             var btnMaterial = document.getElementById('btn-material');
 
             if (groupingMode != btnMode) {
+                activeGroup = null;
                 groupingMode = btnMode;
                 renderClouds();
                 if (settleTimer != null) { clearTimeout(settleTimer); }
@@ -219,10 +220,20 @@ function renderFilterButtons(container, mode) {
                 }
             }
 
-            scrollToCloud(key);
-            document.querySelectorAll('#controls-bar button').forEach(b => {
-                if (b.dataset.value) b.setAttribute('aria-pressed', b.dataset.value == activeGroup ? 'true' : 'false');
+            activeGroup = (activeGroup === key) ? null : key;
+            applySearch();
+            document.querySelectorAll('#controls-bar button[data-value]').forEach(b => {
+                b.setAttribute('aria-pressed', b.dataset.value === activeGroup ? 'true' : 'false');
             });
+
+            if (activeGroup && clusterCenters[activeGroup] && scrollMode !== 'focus') {
+                var center = clusterCenters[activeGroup];
+                var hp = document.getElementById('homepage');
+                var viewCenterX = (hp ? hp.clientWidth : window.innerWidth) / 2;
+                zoomTx = viewCenterX - getCloudViewX() - center.x * zoomLevel;
+                clampPanX();
+                applyCurrentTransform();
+            }
         });
 
         li.appendChild(btn);
@@ -297,6 +308,23 @@ function updateCardSize() {
     cardHalfSize = (sample && sample.offsetWidth > 0) ? Math.round(sample.offsetWidth / 2) : Math.round(Math.min(28, Math.max(14, window.innerWidth * 0.02)) / 2);
 }
 
+function updateHoverScale() {
+    var hp = document.getElementById('homepage');
+    if (!hp) return;
+    var scale;
+    if (scrollMode === 'normal') {
+        scale = 7;
+    } else {
+        var cardH = cardHalfSize * 2;
+        var cloudScale = scrollMode === 'focus'
+            ? getFocusScale(focusKeys[focusClusterIndex])
+            : zoomLevel;
+        scale = Math.max(2, Math.min(10, Math.round((hp.clientHeight * 0.45) / (cardH * cloudScale))));
+    }
+    hp.style.setProperty('--article-hover-scale', scale);
+    hp.style.setProperty('--h3-sep-scaleY', (1 / scale).toFixed(3));
+}
+
 function initPhysics() {
     physicsEngine = Matter.Engine.create();
     physicsEngine.gravity.x = 0;
@@ -332,7 +360,7 @@ function settlePhysics() {
         var obj = objLookup[sysNum];
         var groupKey = obj ? getObjectGroupKey(obj) : null;
         var card = cardMap[sysNum];
-        if (groupKey && card && card.style.display != 'none') {
+        if (groupKey && card) {
             (clusterBodies[groupKey] = clusterBodies[groupKey] || []).push(sysNum);
         }
     }
@@ -442,15 +470,24 @@ function scrollToCloud(key) {
 }
 
 function applySearch() {
+    var visibleKeys = new Set();
     currentObjectList.forEach(obj => {
         var card = cardMap[obj.systemNumber];
         if (!card) return;
         var typeMatch = searchTypeText == '' || [obj.displayName, obj.specificLabel, obj.objectType].some(s => s && s.toLowerCase().includes(searchTypeText));
         var matMatch = searchMatText == '' || [obj.material, obj.apiMaterial].some(s => s && s.toLowerCase().includes(searchMatText));
-        var visible = typeMatch && matMatch;
+        var clusterMatch = !activeGroup || getObjectGroupKey(obj) == activeGroup;
+        var visible = typeMatch && matMatch && clusterMatch;
         card.style.display = visible ? '' : 'none';
-        if (physicsBodies[obj.systemNumber]) Matter.Body.setStatic(physicsBodies[obj.systemNumber], !visible);
+        if (physicsBodies[obj.systemNumber]) Matter.Body.setStatic(physicsBodies[obj.systemNumber], !visible || physicsSettled);
+        if (visible) visibleKeys.add(getObjectGroupKey(obj));
     });
+    if (cloudAreaEl) {
+        var dataAttr = groupingMode == 'category' ? 'data-cluster' : 'data-material';
+        cloudAreaEl.querySelectorAll('section[' + dataAttr + ']').forEach(function(sec) {
+            sec.style.display = visibleKeys.has(sec.getAttribute(dataAttr)) ? '' : 'none';
+        });
+    }
 }
 
 function setupFilters(catOpt, matOpt, searchT, searchM) {
@@ -463,12 +500,12 @@ function setupFilters(catOpt, matOpt, searchT, searchM) {
     if (btnCategory) {
         btnCategory.disabled = true;
         btnCategory.title = LOADING_TOOLTIP;
-        btnCategory.addEventListener('click', () => { groupingMode = 'category'; btnCategory.setAttribute('aria-pressed', 'true'); if (btnMaterial) btnMaterial.setAttribute('aria-pressed', 'false'); renderClouds(); if (settleTimer) clearTimeout(settleTimer); settleTimer = setTimeout(settlePhysics, 4000); scheduleMirrorListBuild(); });
+        btnCategory.addEventListener('click', () => { activeGroup = null; document.querySelectorAll('#controls-bar button[data-value]').forEach(b => b.setAttribute('aria-pressed', 'false')); groupingMode = 'category'; btnCategory.setAttribute('aria-pressed', 'true'); if (btnMaterial) btnMaterial.setAttribute('aria-pressed', 'false'); renderClouds(); if (settleTimer) clearTimeout(settleTimer); settleTimer = setTimeout(settlePhysics, 4000); scheduleMirrorListBuild(); });
     }
     if (btnMaterial) {
         btnMaterial.disabled = true;
         btnMaterial.title = LOADING_TOOLTIP;
-        btnMaterial.addEventListener('click', () => { groupingMode = 'material'; btnMaterial.setAttribute('aria-pressed', 'true'); if (btnCategory) btnCategory.setAttribute('aria-pressed', 'false'); renderClouds(); if (settleTimer) clearTimeout(settleTimer); settleTimer = setTimeout(settlePhysics, 4000); scheduleMirrorListBuild(); });
+        btnMaterial.addEventListener('click', () => { activeGroup = null; document.querySelectorAll('#controls-bar button[data-value]').forEach(b => b.setAttribute('aria-pressed', 'false')); groupingMode = 'material'; btnMaterial.setAttribute('aria-pressed', 'true'); if (btnCategory) btnCategory.setAttribute('aria-pressed', 'false'); renderClouds(); if (settleTimer) clearTimeout(settleTimer); settleTimer = setTimeout(settlePhysics, 4000); scheduleMirrorListBuild(); });
     }
 
     if (searchT) searchT.addEventListener('input', () => { searchTypeText = searchT.value.toLowerCase(); applySearch(); });
@@ -696,7 +733,7 @@ function buildHoverText(obj) {
 
     if (groupingMode === 'material') {
         if (obj.apiMaterial) {
-            parts.push(escapeHtml(obj.apiMaterial));
+            parts.push('API: ' + escapeHtml(obj.apiMaterial));
         }
         if (obj.specificMaterial || obj.material) {
             var matLabel = (obj.specificMaterial || obj.material).replace(/^a /, '').replace(/ toy$/, '');
@@ -778,6 +815,7 @@ function applyZoom(newScale) {
     zoomLevel = newScale;
     clampPanX();
     applyCurrentTransform();
+    updateHoverScale();
 }
 
 function getFocusScale(key) {
@@ -813,6 +851,7 @@ function applyFocusState() {
     }
     var focusLabelEl = document.getElementById('focus-label');
     if (focusLabelEl) { focusLabelEl.textContent = getGroupDisplayName(focusKeys[focusClusterIndex]); focusLabelEl.hidden = false; }
+    updateHoverScale();
 }
 
 function resetTransform() {
@@ -827,9 +866,11 @@ function resetTransform() {
     document.body.classList.remove('focus-mode');
     updateClusterTabFocus();
     updateNavArrows();
+    updateHoverScale();
 }
 
 function handleWheel(e) {
+    if (e.target.closest && e.target.closest('#ai-panel')) return;
     var sec = document.getElementById('homepage'), rect = sec.getBoundingClientRect();
     if (mouseClientX < rect.left || mouseClientX > rect.right || mouseClientY < rect.top || mouseClientY > rect.bottom) return;
     var dx = e.deltaMode == 1 ? e.deltaX * 20 : (e.deltaMode == 2 ? e.deltaX * window.innerWidth : e.deltaX);
