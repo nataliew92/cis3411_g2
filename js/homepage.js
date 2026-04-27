@@ -6,11 +6,11 @@ const cacheKey = "va_cluster_cache";
 
 const specificTypeLabels = [
     "a toy car", "a toy plane", "a toy train", "a toy boat", "a toy truck", "a toy tractor",
-    "a clockwork toy", "a pull-along toy", "a ride-on toy", "a doll", "a baby doll",
+    "a clockwork toy", "a pull-along toy", "a rocking horse or pedal ride-on vehicle", "a doll", "a baby doll",
     "a fashion doll", "a paper doll", "a porcelain doll", "a rag doll", "a teddy bear",
     "a soft toy", "a stuffed animal", "an action figure", "a toy soldier",
     "a soft character toy", "a character doll", "a plush toy", "a puppet",
-    "a marionette", "a board game", "a jigsaw puzzle", "a card game", "a dolls house",
+    "a marionette puppet with dangling strings", "a board game", "a jigsaw puzzle", "a card game", "a dolls house",
     "a miniature room", "dolls house furniture", "doll clothing", "doll accessories"
 ];
 
@@ -79,7 +79,7 @@ var zoomTy = 0;
 var focusKeys = [];
 var focusClusterIndex = 0;
 var focusScrollAcc = 0;
-var FOCUS_SCROLL_THRESHOLD = 300;
+var FOCUS_SCROLL_THRESHOLD = 600;
 var mouseClientX = 0;
 var mouseClientY = 0;
 var cloudBaseX = 0;
@@ -172,7 +172,12 @@ function buildObjectList(records) {
             specificLabel: null,
             cluster: null,
             material: null,
-            apiMaterial: null
+            specificMaterial: null,
+            apiMaterial: null,
+            typeScore: null,
+            secondLabel: null,
+            secondScore: null,
+            materialScore: null
         };
     });
 }
@@ -259,7 +264,7 @@ function calculateClusterCenters(mode) {
     var cloudHeight = hp.clientHeight; 
     var centerY = cloudHeight / 2; // Precise mathematical center
     var cursorX = 80; 
-    var gapW = 150; 
+    var gapW = Math.round(Math.max(40, Math.min(150, hp.clientWidth * 0.08)));
 
     keys.forEach(key => {
         var count = countPerKey[key] || 0;
@@ -333,14 +338,25 @@ function settlePhysics() {
     }
 
     var goldenAngle = 2.39996;
+    var hp = document.getElementById('homepage');
+    var maxCardY = hp ? hp.clientHeight - cardHalfSize : 9999;
     for (var key in clusterBodies) {
         var center = clusterCenters[key];
         if (center) {
+            var count = clusterBodies[key].length;
+            var spaceAbove = center.y - cardHalfSize;
+            var spaceBelow = maxCardY - center.y;
+            var maxR = Math.min(spaceAbove, spaceBelow) * 0.85;
+            var c = count > 1 ? maxR / Math.sqrt(count) : 0;
+            var minCardX = Math.max(cardHalfSize, center.x - maxR);
+            var maxCardX = center.x + maxR;
             clusterBodies[key].forEach((sysNum, i) => {
                 var body = physicsBodies[sysNum];
                 var angle = i * goldenAngle;
-                var radius = cardHalfSize * Math.sqrt(i);
-                Matter.Body.setPosition(body, { x: center.x + Math.cos(angle) * radius, y: Math.max(cardHalfSize, center.y + Math.sin(angle) * radius) });
+                var radius = c * Math.sqrt(i);
+                var cardX = Math.min(maxCardX, Math.max(minCardX, center.x + Math.cos(angle) * radius));
+                var cardY = Math.min(maxCardY, Math.max(cardHalfSize, center.y + Math.sin(angle) * radius));
+                Matter.Body.setPosition(body, { x: cardX, y: cardY });
                 Matter.Body.setStatic(body, true);
             });
         }
@@ -406,7 +422,7 @@ function renderClouds() {
         if (getObjectGroupKey(obj) && cardMap[obj.systemNumber]) {
             var card = cardMap[obj.systemNumber];
             var h3 = card.querySelector('h3');
-            if (h3) h3.textContent = buildHoverText(obj);
+            if (h3) h3.innerHTML = buildHoverText(obj);
             cloudAreaEl.appendChild(card);
             spawnCardBody(obj);
         }
@@ -461,11 +477,11 @@ function setupFilters(catOpt, matOpt, searchT, searchM) {
 
 function mapSpecificToCluster(specificLabel) {
     const mappings = {
-        'a toy vehicle or mechanical toy': ["a toy car", "a toy plane", "a toy train", "a toy boat", "a toy truck", "a toy tractor", "a clockwork toy", "a pull-along toy", "a ride-on toy"],
+        'a toy vehicle or mechanical toy': ["a toy car", "a toy plane", "a toy train", "a toy boat", "a toy truck", "a toy tractor", "a clockwork toy", "a pull-along toy", "a rocking horse or pedal ride-on vehicle"],
         'a doll': ["a doll", "a baby doll", "a fashion doll", "a paper doll", "a porcelain doll", "a rag doll", "a character doll"],
         'a soft toy or teddy bear': ["a teddy bear", "a soft toy", "a stuffed animal", "a soft character toy", "a plush toy"],
         'an action figure or toy soldier': ["an action figure", "a toy soldier"],
-        'a puppet or marionette': ["a puppet", "a marionette"],
+        'a puppet or marionette': ["a puppet", "a marionette puppet with dangling strings"],
         'a game or puzzle': ["a board game", "a jigsaw puzzle", "a card game"],
         'a dolls house or miniature room': ["a dolls house", "a miniature room", "dolls house furniture"],
         'doll clothing or doll accessories': ["doll clothing", "doll accessories"]
@@ -514,7 +530,7 @@ function applyObjectTypeMapping(objectList) {
 
 function saveCache(objectList) {
     let cache = {};
-    objectList.forEach(obj => cache[obj.systemNumber] = { specificLabel: obj.specificLabel, cluster: obj.cluster, material: obj.material, apiMaterial: obj.apiMaterial });
+    objectList.forEach(obj => cache[obj.systemNumber] = { specificLabel: obj.specificLabel, cluster: obj.cluster, material: obj.material, specificMaterial: obj.specificMaterial, apiMaterial: obj.apiMaterial, typeScore: obj.typeScore, secondLabel: obj.secondLabel, secondScore: obj.secondScore, materialScore: obj.materialScore });
     localStorage.setItem(cacheKey, JSON.stringify(cache));
 }
 
@@ -591,30 +607,40 @@ async function classifyAll(objectList) {
             obj.cluster = mapSpecificToCluster(result.specificLabel);
             specificMat = result.material;
             obj.material = mapSpecificToMaterial(specificMat);
+            obj.specificMaterial = specificMat;
             typeConfidence = result.typeScore || 0;
             matConfidence = result.materialScore || 0;
+            obj.typeScore = result.typeScore || 0;
+            obj.secondLabel = result.secondLabel || null;
+            obj.secondScore = result.secondScore || null;
+            obj.materialScore = result.materialScore || 0;
         } catch (e) { console.error(e); }
 
         if (card) card.removeAttribute('data-classifying');
+
+        if (card && typeConfidence > 0) {
+            card.setAttribute('data-confidence', typeConfidence >= 0.8 ? 'high' : typeConfidence >= 0.35 ? 'medium' : 'low');
+        }
 
         // Restore AI Log population
         var logList = document.getElementById('ai-log');
         if (logList != null) {
             var clusterName = clusterDisplayNames[obj.cluster] || obj.cluster || 'Unclassified';
             var matClusterName = materialDisplayNames[obj.material] || obj.material || 'Unknown';
+            var typeScoreStr = typeConfidence > 0 ? ' (' + (Math.round(typeConfidence * 10) / 10) + ')' : '';
+            var matScoreStr = matConfidence > 0 ? ' (' + (Math.round(matConfidence * 10) / 10) + ')' : '';
             var logItem = document.createElement('li');
-            logItem.innerHTML = 
+            logItem.innerHTML =
                 '<span class="ai-log-name">' + obj.displayName + '</span>' +
                 '<span class="ai-log-api">API object type: ' + (obj.objectType || 'unknown') + '</span>' +
                 '<span class="ai-log-api">API material: ' + (obj.apiMaterial || 'not available') + '</span>' +
-                '<span class="ai-log-ai">AI object label: ' + (obj.specificLabel || 'unrecognised') + ' - ' + clusterName + ' (' + Math.round(typeConfidence * 100) + '% confidence)</span>' +
-                '<span class="ai-log-material">AI material label: ' + (specificMat || 'unrecognised') + ' - ' + matClusterName + ' (' + Math.round(matConfidence * 100) + '% confidence)</span>';
+                '<span class="ai-log-ai">AI object label: ' + (obj.specificLabel || 'unrecognised') + ' - ' + clusterName + typeScoreStr + '</span>' +
+                '<span class="ai-log-material">AI material label: ' + (specificMat || 'unrecognised') + ' - ' + matClusterName + matScoreStr + '</span>';
             logList.appendChild(logItem);
             logItem.scrollIntoView({ block: 'nearest' });
         }
 
         moveCardToCloud(obj);
-        saveCache(currentObjectList);
 
         var remaining = objectList.length - (i + 1);
         var panelTitle = document.getElementById('ai-panel-title');
@@ -654,15 +680,55 @@ function renderPendingSection(unclassified, allObjects) {
     document.querySelector('main').appendChild(pendingEl);
 }
 
+function escapeHtml(s) {
+    return s ? s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+}
+
 function buildHoverText(obj) {
-    return [obj.title, obj.specificLabel, clusterDisplayNames[obj.cluster]].filter(Boolean).join(' | ');
+    function getTier(score) {
+        if (score == null || score <= 0) return null;
+        if (score >= 0.8) return 'High';
+        if (score >= 0.35) return 'Medium';
+        return 'Low';
+    }
+    var parts = [];
+    parts.push(escapeHtml(obj.displayName || obj.title));
+
+    if (groupingMode === 'material') {
+        if (obj.apiMaterial) {
+            parts.push(escapeHtml(obj.apiMaterial));
+        }
+        if (obj.specificMaterial || obj.material) {
+            var matLabel = (obj.specificMaterial || obj.material).replace(/^a /, '').replace(/ toy$/, '');
+            var matTier = getTier(obj.materialScore);
+            parts.push(matTier ? 'AI (conf ' + matTier + '): ' + escapeHtml(matLabel) : escapeHtml(matLabel));
+        }
+    } else {
+        var shortLabelOverrides = {
+            'a rocking horse or pedal ride-on vehicle': 'rocking horse',
+            'a marionette puppet with dangling strings': 'marionette'
+        };
+        function shortLabel(label) {
+            if (!label) return '';
+            return shortLabelOverrides[label] || label.replace(/^an? /, '');
+        }
+        if (obj.specificLabel) {
+            var tier = getTier(obj.typeScore);
+            parts.push(tier ? 'AI (conf ' + tier + '): ' + escapeHtml(shortLabel(obj.specificLabel)) : escapeHtml(shortLabel(obj.specificLabel)));
+        }
+        if (obj.cluster) {
+            var clusterName = clusterDisplayNames[obj.cluster] || obj.cluster;
+            parts.push('Cluster: ' + escapeHtml(clusterName));
+        }
+    }
+    return parts.join('<br><span class="h3-sep"></span><br>');
 }
 
 function moveCardToCloud(obj) {
     var card = cardMap[obj.systemNumber];
     if (!card) return;
     var h3 = card.querySelector('h3');
-    if (h3) h3.textContent = buildHoverText(obj);
+    if (h3) h3.innerHTML = buildHoverText(obj);
     if (card.parentNode != cloudAreaEl) {
         card.style.position = 'absolute';
         card.style.left = '-9999px';
@@ -717,23 +783,48 @@ function applyZoom(newScale) {
 function getFocusScale(key) {
     var count = currentObjectList.filter(obj => getObjectGroupKey(obj) == key).length;
     var radius = Math.max(60, cardHalfSize * Math.sqrt(count));
-    var sec = document.getElementById('homepage');
-    return Math.min(8, Math.max(1.5, Math.min(sec.offsetWidth, window.innerHeight) * 0.45 / radius));
+    var hp = document.getElementById('homepage');
+    var availW = hp ? hp.clientWidth : window.innerWidth;
+    var availH = hp ? hp.clientHeight : window.innerHeight;
+    var edgePad = 40;
+    var maxFitScale = Math.min(
+        (availH - edgePad * 2) / (2 * radius),
+        (availW - edgePad * 2) / (2 * radius)
+    );
+    return Math.min(2.5, maxFitScale, Math.max(1.0, Math.min(availW, availH) * 0.22 / radius));
 }
 
 function applyFocusState() {
     if (focusKeys.length == 0) return;
     var key = focusKeys[focusClusterIndex], center = clusterCenters[key], scale = getFocusScale(key);
     var sec = document.getElementById('homepage'), sectionTop = Math.max(0, sec.getBoundingClientRect().top);
-    var viewCenterX = window.innerWidth / 2, viewCenterY = sectionTop + (window.innerHeight - sectionTop) / 2;
-    var tx = viewCenterX - getCloudViewX() - center.x * scale - (focusScrollAcc / FOCUS_SCROLL_THRESHOLD) * window.innerWidth;
+    var edgePad = 40;
+    var viewCenterX = window.innerWidth / 2;
+    var viewCenterY = sectionTop + edgePad + (sec.clientHeight - edgePad * 2) / 2;
+    var tx = viewCenterX - getCloudViewX() - center.x * scale + zoomTx;
     var ty = viewCenterY - getCloudViewY() - center.y * scale;
     if (cloudAreaEl) { cloudAreaEl.style.transformOrigin = '0 0'; cloudAreaEl.style.transform = 'translate(' + tx + 'px, ' + ty + 'px) scale(' + scale + ')'; }
+    document.body.classList.add('focus-mode');
+    var focusDataAttr = groupingMode == 'category' ? 'data-cluster' : 'data-material';
+    if (cloudAreaEl) {
+        cloudAreaEl.querySelectorAll('section[' + focusDataAttr + ']').forEach(function(s) {
+            s.style.opacity = '0';
+        });
+    }
+    var focusLabelEl = document.getElementById('focus-label');
+    if (focusLabelEl) { focusLabelEl.textContent = getGroupDisplayName(focusKeys[focusClusterIndex]); focusLabelEl.hidden = false; }
 }
 
 function resetTransform() {
     scrollMode = 'normal'; zoomLevel = 1; zoomTx = 0; zoomTy = 0; focusScrollAcc = 0; focusClusterIndex = 0; focusKeys = [];
     if (cloudAreaEl) { cloudAreaEl.style.transform = ''; cloudAreaEl.style.transformOrigin = ''; }
+    if (cloudAreaEl) {
+        var resetDataAttr = groupingMode == 'category' ? 'data-cluster' : 'data-material';
+        cloudAreaEl.querySelectorAll('section[' + resetDataAttr + ']').forEach(function(sec) { sec.style.opacity = ''; });
+    }
+    var focusLabelEl = document.getElementById('focus-label');
+    if (focusLabelEl) focusLabelEl.hidden = true;
+    document.body.classList.remove('focus-mode');
     updateClusterTabFocus();
     updateNavArrows();
 }
@@ -743,23 +834,30 @@ function handleWheel(e) {
     if (mouseClientX < rect.left || mouseClientX > rect.right || mouseClientY < rect.top || mouseClientY > rect.bottom) return;
     var dx = e.deltaMode == 1 ? e.deltaX * 20 : (e.deltaMode == 2 ? e.deltaX * window.innerWidth : e.deltaX);
     var dy = e.deltaMode == 1 ? e.deltaY * 20 : (e.deltaMode == 2 ? e.deltaY * window.innerHeight : e.deltaY);
-    if (scrollMode != 'focus' && Math.abs(dx) > Math.abs(dy)) { e.preventDefault(); zoomTx -= dx; clampPanX(); applyCurrentTransform(); return; }
+    if (Math.abs(dx) > Math.abs(dy)) { e.preventDefault(); zoomTx -= dx; if (scrollMode == 'focus') { applyFocusState(); } else { clampPanX(); applyCurrentTransform(); } return; }
     if (!physicsSettled) return;
     var hint = document.getElementById('scroll-hint'); if (hint) hint.hidden = true;
     if (scrollMode == 'normal') {
         if (dy < 0) { e.preventDefault(); scrollMode = 'zoom'; applyZoom(Math.min(zoomLevel + Math.min(Math.abs(dy) * 0.0015, 0.3), 6)); }
-        else if (dy > 0) { e.preventDefault(); focusKeys = getActiveClusterKeys(); if (focusKeys.length) { scrollMode = 'focus'; focusClusterIndex = 0; focusScrollAcc = 0; applyFocusState(); announceCluster(); } }
+        else if (dy > 0) { e.preventDefault(); focusKeys = getActiveClusterKeys(); if (focusKeys.length) { scrollMode = 'focus'; focusClusterIndex = 0; focusScrollAcc = 0; zoomTx = 0; applyFocusState(); announceCluster(); } }
     } else if (scrollMode == 'zoom') {
         e.preventDefault(); var inc = Math.min(Math.abs(dy) * 0.0015, 0.3);
         if (dy > 0) { var ns = Math.max(1, zoomLevel - inc); if (ns <= 1) resetTransform(); else applyZoom(ns); }
         else applyZoom(Math.min(zoomLevel + inc, 6));
     } else if (scrollMode == 'focus') {
-        e.preventDefault(); if (dy < 0) { resetTransform(); return; }
+        e.preventDefault();
+        var maxForward = FOCUS_SCROLL_THRESHOLD - focusScrollAcc;
+        var maxBackward = -FOCUS_SCROLL_THRESHOLD - focusScrollAcc;
+        if (dy > maxForward) dy = maxForward;
+        if (dy < maxBackward) dy = maxBackward;
         focusScrollAcc += dy;
         if (focusScrollAcc >= FOCUS_SCROLL_THRESHOLD) {
             focusClusterIndex++; focusScrollAcc -= FOCUS_SCROLL_THRESHOLD;
             if (focusClusterIndex >= focusKeys.length) { resetTransform(); return; }
             announceCluster();
+        } else if (focusScrollAcc <= -FOCUS_SCROLL_THRESHOLD) {
+            if (focusClusterIndex > 0) { focusClusterIndex--; focusScrollAcc += FOCUS_SCROLL_THRESHOLD; announceCluster(); }
+            else { resetTransform(); return; }
         }
         applyFocusState();
     }
@@ -778,11 +876,31 @@ function announceCluster() {
 
 function handleKeyDown(e) {
     if (['INPUT', 'BUTTON', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
-    if (e.key == 'ArrowLeft' || e.key == 'ArrowRight') { if (scrollMode != 'focus') { e.preventDefault(); zoomTx += e.key == 'ArrowLeft' ? 200 : -200; clampPanX(); applyCurrentTransform(); } return; }
+    if (e.key == 'ArrowLeft' || e.key == 'ArrowRight') { e.preventDefault(); zoomTx += e.key == 'ArrowLeft' ? 200 : -200; if (scrollMode == 'focus') { applyFocusState(); } else { clampPanX(); applyCurrentTransform(); } return; }
     if (!physicsSettled) return;
     if (e.key == 'Escape') { if (scrollMode != 'normal') { e.preventDefault(); resetTransform(); announceCluster(); } return; }
-    if (e.key == 'ArrowDown') { e.preventDefault(); var h = document.getElementById('scroll-hint'); if (h) h.hidden = true; if (scrollMode == 'normal') { focusKeys = getActiveClusterKeys(); if (focusKeys.length) { scrollMode = 'focus'; focusClusterIndex = 0; focusScrollAcc = 0; applyFocusState(); announceCluster(); } } else if (scrollMode == 'focus') { focusClusterIndex++; focusScrollAcc = 0; if (focusClusterIndex >= focusKeys.length) { resetTransform(); announceCluster(); } else { applyFocusState(); announceCluster(); } } return; }
+    if (e.key == 'ArrowDown') { e.preventDefault(); var h = document.getElementById('scroll-hint'); if (h) h.hidden = true; if (scrollMode == 'normal') { focusKeys = getActiveClusterKeys(); if (focusKeys.length) { scrollMode = 'focus'; focusClusterIndex = 0; focusScrollAcc = 0; zoomTx = 0; applyFocusState(); announceCluster(); } } else if (scrollMode == 'focus') { focusClusterIndex++; focusScrollAcc = 0; if (focusClusterIndex >= focusKeys.length) { resetTransform(); announceCluster(); } else { applyFocusState(); announceCluster(); } } return; }
     if (e.key == 'ArrowUp') { e.preventDefault(); if (scrollMode == 'focus') { if (focusClusterIndex > 0) { focusClusterIndex--; focusScrollAcc = 0; applyFocusState(); announceCluster(); } else { resetTransform(); announceCluster(); } } return; }
+}
+
+function setupCardHoverOrigin() {
+    if (!cloudAreaEl) return;
+    cloudAreaEl.addEventListener('mouseover', function(e) {
+        var article = e.target.closest('article');
+        if (!article || article.parentNode != cloudAreaEl) return;
+        var rect = article.getBoundingClientRect();
+        var hp = document.getElementById('homepage');
+        var hpRect = hp.getBoundingClientRect();
+        var cx = rect.left + rect.width / 2 - hpRect.left;
+        var cy = rect.top + rect.height / 2 - hpRect.top;
+        var ox = cx < hpRect.width / 3 ? 'left' : cx > hpRect.width * 2 / 3 ? 'right' : 'center';
+        var oy = cy < hpRect.height / 3 ? 'top' : cy > hpRect.height * 2 / 3 ? 'bottom' : 'center';
+        article.style.transformOrigin = ox + ' ' + oy;
+    });
+    cloudAreaEl.addEventListener('mouseleave', function(e) {
+        var article = e.target.closest('article');
+        if (article) article.style.transformOrigin = '';
+    }, true);
 }
 
 function setupScrollInteraction() {
@@ -812,6 +930,7 @@ function setupScrollInteraction() {
     document.addEventListener('keydown', handleKeyDown);
     window.addEventListener('resize', () => { initCloudBasePosition(); calculateClusterCenters(groupingMode); repositionLabels(); });
     initCloudBasePosition();
+    setupCardHoverOrigin();
 }
 
 function buildMirrorList() {
@@ -882,27 +1001,31 @@ async function displayObjects() {
     let pre = await fetchPreClusters();
     if (pre) { applyCache(objectList, pre); calculateClusterCenters(groupingMode); repositionLabels(); }
 
-    let preclustered = objectList.filter(o => o.specificLabel != null), unclassified = objectList.filter(o => o.specificLabel == null);
+    let preclustered = objectList.filter(o => o.specificLabel != null && o.typeScore != null && o.materialScore != null);
+    let unclassified = objectList.filter(o => o.specificLabel == null || o.typeScore == null || o.materialScore == null);
     renderPendingSection(unclassified, objectList);
     updateCardSize();
 
     var modelProgWrap = document.getElementById('model-progress-wrap');
-    if (modelProgWrap) modelProgWrap.classList.remove('sr-only');
 
-    await Promise.all([movePreClustered(preclustered), unclassified.length ? fetchApiMaterials(unclassified) : Promise.resolve()]);
+    var needsMaterial = unclassified.filter(function(o) { return !o.apiMaterial; });
+    await Promise.all([movePreClustered(preclustered), needsMaterial.length ? fetchApiMaterials(needsMaterial) : Promise.resolve()]);
 
-    if (unclassified.length) {
-        updateResultsStatus('Initializing collection...'); 
-        let start = Date.now(); await classifyAll(unclassified);
-        console.log('AI done. Time: ' + ((Date.now() - start) / 1000).toFixed(1) + 's');
+    try {
+        if (unclassified.length) {
+            if (modelProgWrap) modelProgWrap.classList.remove('sr-only');
+            updateResultsStatus('Initializing collection...');
+            let start = Date.now(); await classifyAll(unclassified);
+            console.log('AI done. Time: ' + ((Date.now() - start) / 1000).toFixed(1) + 's');
+        }
+    } finally {
+        if (modelProgWrap) modelProgWrap.classList.add('completely-hidden');
     }
 
     saveCache(objectList);
     updateResultsStatus('All ' + objectList.length + ' objects clustered. Ready to explore.');
     settlePhysics();
     scheduleMirrorListBuild();
-
-    if (modelProgWrap) modelProgWrap.classList.add('completely-hidden');
     if (loadPopup && loadPopup.open) loadPopup.close();
 
     // Enable all filter buttons
@@ -920,3 +1043,30 @@ async function displayObjects() {
 }
 
 displayObjects();
+
+window.exportCache = function() {
+    var cache = {};
+    currentObjectList.forEach(function(obj) {
+        if (obj.specificLabel) {
+            cache[obj.systemNumber] = {
+                specificLabel: obj.specificLabel,
+                cluster: obj.cluster,
+                material: obj.material,
+                specificMaterial: obj.specificMaterial,
+                apiMaterial: obj.apiMaterial,
+                typeScore: obj.typeScore,
+                secondLabel: obj.secondLabel,
+                secondScore: obj.secondScore,
+                materialScore: obj.materialScore
+            };
+        }
+    });
+    var blob = new Blob([JSON.stringify(cache, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'clusters.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+};
