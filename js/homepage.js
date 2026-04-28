@@ -682,7 +682,7 @@ async function classifyAll(objectList) {
         var remaining = objectList.length - (i + 1);
         var panelTitle = document.getElementById('ai-panel-title');
         if (panelTitle) panelTitle.textContent = remaining > 0 ? 'Items to be classified (' + remaining + ')' : 'All items classified';
-        await delay(600);
+        await delay(100);
     }
 }
 
