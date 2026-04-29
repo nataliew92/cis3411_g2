@@ -286,6 +286,85 @@ function navigate(dir) {
 }
 window.navigate = navigate;
 
+// ── Single-artefact deep link (from index.html) ───────────────────────────
+
+// Try to fetch full V&A metadata (description, materials, physDesc) for a
+// single object using its system number. Returns null if not found.
+async function fetchSingleArtefactDetails(systemNumber) {
+  const p = new URLSearchParams({ q: systemNumber, page_size: 5 });
+  try {
+    const d = await (await fetch(`${API_BASE}?${p}`)).json();
+    const rec = (d.records || []).find(r => r.systemNumber === systemNumber);
+    if (!rec) return null;
+    return {
+      description: rec._primaryDescription || '',
+      materials:   (rec.materialsAndTechniques || []).map(m => m.text).join(", ") || '',
+      physDesc:    rec.physicalDescription || '',
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+// If the URL has ?id=...&img=...&title=..., load that artefact directly
+// instead of waiting for the user to click Load Collection.
+async function loadFromURL() {
+  const params  = new URLSearchParams(window.location.search);
+  const id      = params.get('id');
+  const imageId = params.get('img');
+  const title   = params.get('title') || 'Untitled';
+
+  if (!id || !imageId) return false;  // No deep link present
+  
+  // Reveal the back link since we arrived from the homepage
+  document.getElementById("back-to-collection").hidden = false;
+
+  // Build a minimal object from the URL params (image displays immediately)
+  const obj = {
+    id,
+    title,
+    description: '',
+    materials: '',
+    physDesc: '',
+    imageUrl: `${IMAGE_BASE}/${imageId}/full/800,/0/default.jpg`,
+    thumbUrl: `${IMAGE_BASE}/${imageId}/full/100,/0/default.jpg`,
+  };
+
+  // Reuse the existing single-batch state structure
+  objects = [obj];
+  current = 0;
+  results = {};
+
+  buildStrip();
+  showDetail(0);
+
+  // Fetch full V&A metadata in the background and re-render when ready
+  fetchSingleArtefactDetails(id).then(details => {
+    if (details) {
+      Object.assign(obj, details);
+      if (objects[0]?.id === id) showDetail(0);
+    }
+  });
+
+  // Run AI detection if the model is ready
+  if (!detector) {
+    setStatus(`Loaded ${title} — model not ready, detection skipped.`);
+    return true;
+  }
+
+  setStatus(`Running AI detection on ${title}…`, true);
+  try {
+    results[obj.id] = await analyseObject(obj);
+    showDetail(0);
+    setStatus(`Done — analysed ${title}.`);
+  } catch (e) {
+    results[obj.id] = [];
+    setStatus(`Detection failed: ${e.message}`);
+  }
+
+  return true;
+}
+
 // ── Main run ──────────────────────────────────────────────────────────────
 async function run() {
   if (!detector) { setStatus("Model not loaded yet."); return; }
@@ -353,5 +432,8 @@ document.getElementById("ai-notice-dismiss")?.addEventListener("click", () => {
   document.getElementById("ai-notice").hidden = true;
 });
 
-// Start loading model immediately
-loadModel();
+// Start loading model, then check for a deep link from index.html
+(async () => {
+  await loadModel();
+  await loadFromURL();
+})();

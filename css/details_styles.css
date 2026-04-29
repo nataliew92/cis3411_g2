@@ -756,3 +756,23 @@
         gap:8px;
       }
     }
+
+    #back-to-collection {
+    display: block;
+    background: var(--section-bg);
+    border-bottom: 1px solid var(--muted);
+    padding: 8px 40px;
+    font-family: 'Lato', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    color: var(--ink);
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s;
+    }
+
+    #back-to-collection:hover {
+      background: var(--ink);
+      color: var(--cream);
+    }
+
+    #back-to-collection[hidden] { display: none; }
