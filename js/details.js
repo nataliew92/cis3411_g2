@@ -21,6 +21,32 @@ const QUERIES = [
   "a painted face", "a jointed limb", "a pull string", "a key winder"
 ];
 
+// Map AI cluster names to V&A search keywords
+const CLUSTER_QUERIES = {
+  'a toy vehicle or mechanical toy': 'vehicle',
+  'a doll': 'doll',
+  'a soft toy or teddy bear': 'teddy bear',
+  'an action figure or toy soldier': 'figure soldier',
+  'a puppet or marionette': 'puppet',
+  'a game or puzzle': 'game puzzle',
+  'a dolls house or miniature room': 'dolls house',
+  'doll clothing or doll accessories': 'doll clothing'
+};
+
+const CLUSTER_DISPLAY_NAMES = {
+  'a toy vehicle or mechanical toy': 'Vehicles',
+  'a doll': 'Dolls',
+  'a soft toy or teddy bear': 'Soft Toys',
+  'an action figure or toy soldier': 'Action Figures',
+  'a puppet or marionette': 'Puppets',
+  'a game or puzzle': 'Games & Puzzles',
+  'a dolls house or miniature room': "Dolls' Houses",
+  'doll clothing or doll accessories': 'Doll Accessories'
+};
+
+let activeCategory = null;       // The cluster value, e.g. 'a doll'
+let activeCategoryQuery = null;  // The V&A search keyword, e.g. 'doll'
+
 const API_BASE   = "https://api.vam.ac.uk/v2/objects/search";
 const IMAGE_BASE = "https://framemark.vam.ac.uk/collections";
 
@@ -103,11 +129,18 @@ async function loadModel() {
 
 // ── Fetch V&A objects ─────────────────────────────────────────────────────
 async function fetchObjects(n, page = 1) {
-  const p = new URLSearchParams({
-    id_category: "THES48967", id_collection: "THES48593",
-    images_exist: "1", page_size: n, page,
+  const params = {
+    id_category: "THES48967",
+    id_collection: "THES48593",
+    images_exist: "1",
+    page_size: n,
+    page,
     data_restrict: "descriptive_only"
-  });
+  };
+  if (activeCategoryQuery) {
+    params.q = activeCategoryQuery;
+  }
+  const p = new URLSearchParams(params);
   const d = await (await fetch(`${API_BASE}?${p}`)).json();
   totalCount = d.info?.record_count ?? 0;
   totalPages = Math.max(1, Math.ceil(totalCount / n));
@@ -315,12 +348,18 @@ async function loadFromURL() {
   const title   = params.get('title') || 'Untitled';
 
   if (!id || !imageId) return false;  // No deep link present
-  
+
   // Reveal the back link since we arrived from the homepage
   document.getElementById("back-to-collection").hidden = false;
 
-  // Build a minimal object from the URL params (image displays immediately)
-  const obj = {
+  const cluster = params.get('cluster') || '';
+  if (cluster && CLUSTER_QUERIES[cluster]) {
+  activeCategory      = cluster;
+  activeCategoryQuery = CLUSTER_QUERIES[cluster];
+  }
+
+  // Build the focused artefact from URL params
+  const focused = {
     id,
     title,
     description: '',
@@ -330,38 +369,63 @@ async function loadFromURL() {
     thumbUrl: `${IMAGE_BASE}/${imageId}/full/100,/0/default.jpg`,
   };
 
-  // Reuse the existing single-batch state structure
-  objects = [obj];
-  current = 0;
+  setStatus(`Loading ${title} and surrounding artefacts…`, true);
+
+  // Load page 1 of the collection alongside the focused artefact
+  const n = parseInt(document.getElementById("pageSize").value) || 8;
+  let batch = [];
+  try {
+    batch = await fetchObjects(n, 1);
+  } catch (e) {
+    batch = [];  // Fall back to focused-only if collection fetch fails
+  }
+
+  // If the clicked artefact is already on page 1, just focus on it.
+  // Otherwise, prepend it so the user sees it first plus surrounding context.
+  const existingIndex = batch.findIndex(o => o.id === id);
+  if (existingIndex >= 0) {
+    objects = batch;
+    current = existingIndex;
+  } else {
+    objects = [focused, ...batch];
+    current = 0;
+  }
+
   results = {};
+  currentPage = 1;
 
   buildStrip();
-  showDetail(0);
+  showDetail(current);
+  updatePageIndicator();  // Enables Next Set button if more pages exist
 
-  // Fetch full V&A metadata in the background and re-render when ready
+  // Fetch full V&A metadata for the focused artefact in the background
   fetchSingleArtefactDetails(id).then(details => {
-    if (details) {
-      Object.assign(obj, details);
-      if (objects[0]?.id === id) showDetail(0);
+    if (details && objects[current]?.id === id) {
+      Object.assign(objects[current], details);
+      showDetail(current);
     }
   });
 
-  // Run AI detection if the model is ready
+  // Run AI detection on all objects in the batch
   if (!detector) {
-    setStatus(`Loaded ${title} — model not ready, detection skipped.`);
+    setStatus(`Loaded ${objects.length} artefacts — model not ready, detection skipped.`);
     return true;
   }
 
-  setStatus(`Running AI detection on ${title}…`, true);
-  try {
-    results[obj.id] = await analyseObject(obj);
-    showDetail(0);
-    setStatus(`Done — analysed ${title}.`);
-  } catch (e) {
-    results[obj.id] = [];
-    setStatus(`Detection failed: ${e.message}`);
+  setStatus(`Loaded ${objects.length} artefacts — running AI detection…`, true);
+  let done = 0;
+  for (const obj of objects) {
+    try {
+      results[obj.id] = await analyseObject(obj);
+    } catch (e) {
+      results[obj.id] = [];
+    }
+    done++;
+    setStatus(`Analysed ${done} / ${objects.length}…`, done < objects.length);
+    if (objects[current]?.id === obj.id) showDetail(current);
   }
 
+  setStatus(`Done — ${objects.length} artefacts analysed (set ${currentPage} of ${totalPages}).`);
   return true;
 }
 
@@ -402,16 +466,55 @@ async function run() {
 
   setStatus(`Done — ${objects.length} artefacts analysed (set ${currentPage} of ${totalPages}).`);
   btn.disabled = false;
+  document.getElementById("reanalyseBtn").disabled = false;
   updatePageIndicator();
 }
 window.run = run;
 
 function updatePageIndicator() {
   const el = document.getElementById("pageIndicator");
-  el.textContent = `Set ${currentPage} of ${totalPages} (${totalCount.toLocaleString()} total)`;
+  let text = `Set ${currentPage} of ${totalPages} (${totalCount.toLocaleString()} total)`;
+  if (activeCategory && CLUSTER_DISPLAY_NAMES[activeCategory]) {
+    text += ` — ${CLUSTER_DISPLAY_NAMES[activeCategory]}`;
+  }
+  el.textContent = text;
   document.getElementById("prevSetBtn").disabled = currentPage <= 1;
   document.getElementById("nextSetBtn").disabled = currentPage >= totalPages;
 }
+
+// Re-run AI detection on the currently loaded objects with the latest threshold
+async function reanalyse() {
+  if (!detector) { setStatus("Model not loaded yet."); return; }
+  if (!objects.length) { setStatus("Nothing loaded — click Load Collection first."); return; }
+
+  const reBtn = document.getElementById("reanalyseBtn");
+  reBtn.disabled = true;
+  document.getElementById("runBtn").disabled = true;
+  document.getElementById("prevSetBtn").disabled = true;
+  document.getElementById("nextSetBtn").disabled = true;
+
+  // Clear existing detection results so the UI shows "Analysing…" again
+  results = {};
+  showDetail(current);
+
+  const threshold = parseFloat(document.getElementById("threshold").value);
+  setStatus(`Re-analysing ${objects.length} artefacts at ${Math.round(threshold * 100)}% confidence…`, true);
+
+  let done = 0;
+  for (const obj of objects) {
+    try { results[obj.id] = await analyseObject(obj); }
+    catch (e) { results[obj.id] = []; }
+    done++;
+    setStatus(`Re-analysed ${done} / ${objects.length}…`, done < objects.length);
+    if (objects[current]?.id === obj.id) showDetail(current);
+  }
+
+  setStatus(`Done — re-analysed ${objects.length} artefacts at ${Math.round(threshold * 100)}% threshold.`);
+  reBtn.disabled = false;
+  document.getElementById("runBtn").disabled = false;
+  updatePageIndicator();  // Re-enables prev/next set buttons appropriately
+}
+window.reanalyse = reanalyse;
 
 function loadFirstSet() {
   currentPage = 1;

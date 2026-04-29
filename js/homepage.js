@@ -692,7 +692,7 @@ function createCard(obj) {
     card.setAttribute('tabindex', '-1');
     card.dataset.id = obj.systemNumber;
     card.innerHTML = '<h3>' + obj.title + '</h3><picture><img src="' + imageUrl + "/" + obj.imageId + "/full/!400,400/0/default.jpg" + '" alt="" width="400" height="400" loading="lazy"></picture>';
-    card.onclick = () => window.location.href = 'details.html?id=' + obj.systemNumber + '&img=' + encodeURIComponent(obj.imageId) + '&title=' + encodeURIComponent(obj.displayName);
+    card.onclick = () => window.location.href = 'details.html?id=' + obj.systemNumber + '&img=' + encodeURIComponent(obj.imageId) + '&title=' + encodeURIComponent(obj.displayName) + '&cluster=' + encodeURIComponent(obj.cluster || '');
     card.onkeydown = e => { if (e.key == 'Enter' || e.key == ' ') { e.preventDefault(); card.click(); } };
     return card;
 }
@@ -995,7 +995,7 @@ function buildMirrorList() {
             var obj = groupItems[k];
             var itemLi = document.createElement('li');
             var a = document.createElement('a');
-            a.href = 'details.html?id=' + obj.systemNumber + '&img=' + encodeURIComponent(obj.imageId) + '&title=' + encodeURIComponent(obj.displayName);
+            a.href = 'details.html?id=' + obj.systemNumber + '&img=' + encodeURIComponent(obj.imageId) + '&title=' + encodeURIComponent(obj.displayName) + '&cluster=' + encodeURIComponent(obj.cluster || '');
             a.textContent = obj.displayName + (obj.specificLabel ? ' (' + obj.specificLabel + ')' : '');
             itemLi.appendChild(a);
             ul.appendChild(itemLi);
