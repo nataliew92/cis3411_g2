@@ -351,6 +351,7 @@ async function loadFromURL() {
 
   // Reveal the back link since we arrived from the homepage
   document.getElementById("back-to-collection").hidden = false;
+  
 
   const cluster = params.get('cluster') || '';
   if (cluster && CLUSTER_QUERIES[cluster]) {
@@ -572,7 +573,23 @@ document.getElementById("ai-notice-dismiss")?.addEventListener("click", () => {
   document.getElementById("ai-notice").hidden = true;
 });
 
-// Start loading model, then check for a deep link from index.html
+// If we arrived via a deep link, swap the placeholder immediately —
+// before model loading begins — so the user sees relevant messaging.
+const urlParams = new URLSearchParams(window.location.search);
+const urlId     = urlParams.get('id');
+const urlImg    = urlParams.get('img');
+const urlTitle  = urlParams.get('title') || 'Untitled';
+
+if (urlId && urlImg) {
+  document.getElementById("back-to-collection").hidden = false;
+  document.getElementById("main").innerHTML = `
+    <div class="placeholder-msg">
+      <img src="${IMAGE_BASE}/${urlImg}/full/200,/0/default.jpg" alt="" style="max-width:200px;border-radius:2px;margin-bottom:12px;opacity:0.85"/>
+      <p>Loading <strong>${urlTitle}</strong>…<br>The AI is downloading and will analyse this artefact once ready.</p>
+    </div>`;
+}
+
+// Now start loading the model and the artefact data
 (async () => {
   await loadModel();
   await loadFromURL();
