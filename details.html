@@ -8,15 +8,7 @@
   <link rel="stylesheet" href="css/details_styles.css">
 </head>
 <body>
-
-<!--<nav>
-  <div class="logo">Museum <span>Collection</span></div>
-  <div class="nav-links">
-    <a href="index.html">Home</a>
-    <a href="details.html" class="active">Details</a>
-  </div>
-</nav>-->
-
+  
 <header>
   <div id="site-brand">
     <span id="logo-mark">M|E</span>
@@ -43,12 +35,15 @@
   <label>Minimum confidence</label>
   <input type="range" id="threshold" min="0.01" max="0.30" step="0.01" value="0.10"/>
   <span id="thresholdVal" class="threshold-value">10%</span>
-  <div class="preset-chips">
-    <button class="chip" data-value="0.03">Show all</button>
-    <button class="chip active" data-value="0.10">Balanced</button>
-    <button class="chip" data-value="0.20">Strict</button>
-  </div>
-  <button class="btn" id="runBtn" onclick="run()" disabled>Load Collection</button>
+    <div class="preset-chips">
+      <button class="chip" data-value="0.03">Show all</button>
+      <button class="chip active" data-value="0.10">Balanced</button>
+      <button class="chip" data-value="0.20">Strict</button>
+    </div>
+  <button class="btn" id="runBtn" onclick="loadFirstSet()" disabled>Load Collection</button>
+  <span class="page-indicator" id="pageIndicator"></span>
+  <button class="btn secondary" id="prevSetBtn" onclick="changeSet(-1)" disabled>‹ Prev Set</button>
+  <button class="btn secondary" id="nextSetBtn" onclick="changeSet(1)" disabled>Next Set ›</button>
   <button class="btn secondary" id="prevBtn" onclick="navigate(-1)" disabled>← Prev</button>
   <button class="btn secondary" id="nextBtn" onclick="navigate(1)" disabled>Next →</button>
 </div>

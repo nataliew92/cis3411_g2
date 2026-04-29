@@ -26,6 +26,9 @@ const IMAGE_BASE = "https://framemark.vam.ac.uk/collections";
 
 let detector = null;
 let objects  = [], results = {}, current = 0;
+let currentPage = 1;
+let totalPages  = 1;
+let totalCount  = 0;
 
 // ── Threshold slider OLD VERSION ──────────────────────────────────────────────────────
 //document.getElementById("threshold").addEventListener("input", e => {
@@ -99,12 +102,15 @@ async function loadModel() {
 }
 
 // ── Fetch V&A objects ─────────────────────────────────────────────────────
-async function fetchObjects(n) {
+async function fetchObjects(n, page = 1) {
   const p = new URLSearchParams({
-    id_category:"THES48967", id_collection:"THES48593",
-    images_exist:"1", page_size:n, data_restrict:"descriptive_only"
+    id_category: "THES48967", id_collection: "THES48593",
+    images_exist: "1", page_size: n, page,
+    data_restrict: "descriptive_only"
   });
   const d = await (await fetch(`${API_BASE}?${p}`)).json();
+  totalCount = d.info?.record_count ?? 0;
+  totalPages = Math.max(1, Math.ceil(totalCount / n));
   return d.records.filter(r => r._primaryImageId).map(r => ({
     id:          r.systemNumber,
     title:       r._primaryTitle || "Untitled",
@@ -288,11 +294,13 @@ async function run() {
   btn.disabled = true; results = {}; objects = [];
   document.getElementById("prevBtn").disabled = true;
   document.getElementById("nextBtn").disabled = true;
+  document.getElementById("prevSetBtn").disabled = true;
+  document.getElementById("nextSetBtn").disabled = true;
   document.getElementById("strip-wrap").style.display = "none";
   document.getElementById("main").innerHTML = `<div class="placeholder-msg"><div class="big loading">Fetching…</div></div>`;
 
   setStatus("Fetching V&A collection…", true);
-  try { objects = await fetchObjects(n); }
+  try { objects = await fetchObjects(n, currentPage); }
   catch(e) { setStatus(`Failed: ${e.message}`); btn.disabled=false; return; }
 
   if (!objects.length) { setStatus("No objects found."); btn.disabled=false; return; }
@@ -313,10 +321,32 @@ async function run() {
     if (objects[current]?.id === obj.id) showDetail(current);
   }
 
-  setStatus(`Done — ${objects.length} artefacts analysed.`);
+  setStatus(`Done — ${objects.length} artefacts analysed (set ${currentPage} of ${totalPages}).`);
   btn.disabled = false;
+  updatePageIndicator();
 }
 window.run = run;
+
+function updatePageIndicator() {
+  const el = document.getElementById("pageIndicator");
+  el.textContent = `Set ${currentPage} of ${totalPages} (${totalCount.toLocaleString()} total)`;
+  document.getElementById("prevSetBtn").disabled = currentPage <= 1;
+  document.getElementById("nextSetBtn").disabled = currentPage >= totalPages;
+}
+
+function loadFirstSet() {
+  currentPage = 1;
+  run();
+}
+window.loadFirstSet = loadFirstSet;
+
+function changeSet(dir) {
+  const next = currentPage + dir;
+  if (next < 1 || next > totalPages) return;
+  currentPage = next;
+  run();
+}
+window.changeSet = changeSet;
 
 // Start loading model immediately
 loadModel();

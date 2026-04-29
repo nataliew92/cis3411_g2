@@ -234,6 +234,19 @@
       cursor: pointer;
     }
 
+    .page-indicator {
+      font-family: 'Lato', sans-serif;
+    font-size: 0.7rem;
+    color: var(--ink);
+    background: var(--white);
+    border: 1px solid var(--muted);
+    border-radius: 2px;
+    padding: 5px 12px;
+    white-space: nowrap;
+    }
+    
+    .page-indicator:empty { display: none; }
+
     .preset-chips {
       display: flex;
       gap: 4px;
