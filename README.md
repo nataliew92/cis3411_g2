@@ -1,5 +1,7 @@
 # V&A AI Explorer (M|E Museum Explorer)
 
+https://cis4111g2.netlify.app/
+
 University group project for an online museum experience enhanced with AI, specifically for the Young V&A Dolls and Toys collection.
 
 The project consists of two complementary views: a physics-driven cluster overview of the whole collection, and a detail page for inspecting individual artefacts with AI-driven object detection.
