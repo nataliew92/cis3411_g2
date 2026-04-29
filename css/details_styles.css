@@ -94,6 +94,50 @@
       height: auto;             /* override fixed 56px height */
     }
 
+    /* AI classification notice — floating bar above the footer */
+    #ai-notice {
+      position: fixed;
+      bottom: 0.35rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--cream);
+      color: var(--ink);
+      padding: var(--spacing-gap-tight) var(--spacing-gap-regular);
+      border-radius: 2px;
+      z-index: 200;
+      max-width: 44rem;
+      width: calc(100% - 2rem);
+      box-shadow: 2px 6px 0px rgba(0, 0, 0, 0.18);
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-gap-regular);
+      font-size: var(--text-size-sidebar-ui);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    #ai-notice p {
+      margin: 0;
+      flex: 1;
+    }
+
+    #ai-notice-dismiss {
+      flex-shrink: 0;
+      background: var(--ink);
+      color: var(--white);
+      border: none;
+      border-radius: 2px;
+      padding: var(--spacing-gap-tight) var(--spacing-gap-medium);
+      cursor: pointer;
+      font-size: var(--text-size-sidebar-ui);
+      transition: background 0.15s ease;
+    }
+
+    #ai-notice-dismiss:hover {
+      background: var(--muted);
+    }
+
+    #ai-notice[hidden] { display: none; }
+
     .logo {
       font-family: 'Lora', serif;
       font-size: 1.3rem;
@@ -244,7 +288,7 @@
     padding: 5px 12px;
     white-space: nowrap;
     }
-    
+
     .page-indicator:empty { display: none; }
 
     .preset-chips {

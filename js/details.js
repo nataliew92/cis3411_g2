@@ -348,5 +348,10 @@ function changeSet(dir) {
 }
 window.changeSet = changeSet;
 
+// AI notice dismiss
+document.getElementById("ai-notice-dismiss")?.addEventListener("click", () => {
+  document.getElementById("ai-notice").hidden = true;
+});
+
 // Start loading model immediately
 loadModel();
