@@ -426,6 +426,8 @@ async function loadFromURL() {
   }
 
   setStatus(`Done — ${objects.length} artefacts analysed (set ${currentPage} of ${totalPages}).`);
+  document.getElementById("reanalyseBtn").disabled = false;
+  updateCategoryButtons();
   return true;
 }
 
@@ -468,6 +470,7 @@ async function run() {
   btn.disabled = false;
   document.getElementById("reanalyseBtn").disabled = false;
   updatePageIndicator();
+  updateCategoryButtons();
 }
 window.run = run;
 
@@ -529,6 +532,40 @@ function changeSet(dir) {
   run();
 }
 window.changeSet = changeSet;
+
+// ── Category browsing ────────────────────────────────────────────────────
+
+// Highlight the currently active category button
+function updateCategoryButtons() {
+  document.querySelectorAll(".cat-btn").forEach(btn => {
+    const isActive = (btn.dataset.cluster || null) === (activeCategory || null);
+    btn.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
+}
+
+// Switch to a different category and reload from page 1
+async function selectCategory(cluster) {
+  // Empty cluster = "All" (clear the filter)
+  if (!cluster) {
+    activeCategory = null;
+    activeCategoryQuery = null;
+  } else if (CLUSTER_QUERIES[cluster]) {
+    activeCategory = cluster;
+    activeCategoryQuery = CLUSTER_QUERIES[cluster];
+  } else {
+    return;  // Unknown cluster — ignore
+  }
+
+  updateCategoryButtons();
+  currentPage = 1;
+  await run();  // Reuses your existing fetch + analyse pipeline
+}
+window.selectCategory = selectCategory;
+
+// Wire up the click handlers (runs once at page load)
+document.querySelectorAll(".cat-btn").forEach(btn => {
+  btn.addEventListener("click", () => selectCategory(btn.dataset.cluster || ""));
+});
 
 // AI notice dismiss
 document.getElementById("ai-notice-dismiss")?.addEventListener("click", () => {
